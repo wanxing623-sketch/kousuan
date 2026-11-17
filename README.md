@@ -42,7 +42,7 @@ python3 -m http.server 8000
 - `index.html` — 页面结构
 - `app.js` — 题目生成、计时、语音识别与中文数字解析
 - `styles.css` — 样式（移动端优先，支持深色模式）
-- `fonts/` — 按页面用字裁剪的 Noto Sans SC（SIL OFL 1.1，许可证见 `fonts/OFL.txt`），压缩后约 180KB，离线可用；系统装有苹方 / 思源黑体时优先用系统字体
+- `fonts/` — 按页面用字裁剪的 Noto Sans SC（SIL OFL 1.1，许可证见 `fonts/OFL.txt`），两个字重合计约 240KB，离线可用（字体加载失败时自动回落到系统字体）
 
 ## 一些设计取舍
 
