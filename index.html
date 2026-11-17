@@ -3,141 +3,143 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#17181a" media="(prefers-color-scheme: dark)">
-  <meta name="description" content="速算练习：打字或语音作答的口算练习，支持两位数与三位数加减。">
+  <meta name="theme-color" content="#faf8f4">
+  <meta name="description" content="两位数、三位数的加减法口算练习，支持键盘输入与语音作答。">
   <title>速算练习</title>
-  <link rel="preload" href="fonts/NotoSansSC-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="速算练习">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <main class="app">
-    <header class="topbar">
-      <span class="brand"><span class="brand-mark" aria-hidden="true">+</span>速算练习</span>
+  <div class="app">
+    <header class="masthead">
+      <span class="logo" aria-hidden="true">±</span>
+      <div class="masthead-text">
+        <h1>速算练习</h1>
+        <p>两位数与三位数加减法</p>
+      </div>
     </header>
 
-    <section id="setup" class="panel" aria-labelledby="setup-title">
-      <h1 id="setup-title" tabindex="-1">今天练几道？</h1>
-      <p class="lead">选好方式和难度，马上开始。</p>
+    <section class="view" id="setup" aria-label="练习设置">
+      <form class="card" id="setup-form" novalidate>
+        <fieldset class="field">
+          <legend>作答方式</legend>
+          <div class="modes">
+            <button class="mode" type="button" data-mode="type" aria-pressed="true">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6.5 10h.01M10 10h.01M13.5 10h.01M17 10h.01M6.5 13.5h.01M17 13.5h.01M9.5 13.5h5"/></svg>
+              <span class="mode-title">键盘输入</span>
+              <span class="mode-desc">按下数字格，或直接用键盘</span>
+              <span class="mode-dot" aria-hidden="true"></span>
+            </button>
+            <button class="mode" type="button" data-mode="voice" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5v3"/></svg>
+              <span class="mode-title">语音作答</span>
+              <span class="mode-desc">看着题目直接说出答案</span>
+              <span class="mode-dot" aria-hidden="true"></span>
+            </button>
+          </div>
+          <p class="field-note" id="voice-note" hidden>这个浏览器不支持语音识别，先用键盘练也可以。</p>
+          <p class="field-note tip" id="voice-tip" hidden>开始后请允许麦克风；说出答案会自动进入下一题，不用点屏幕。</p>
+        </fieldset>
 
-      <div class="group">
-        <h2 class="group-title"><span class="group-num" aria-hidden="true">1</span>练习方式</h2>
-        <div class="mode-grid">
-          <button class="mode-card selected" type="button" data-mode="typing" aria-pressed="true">
-            <span class="mode-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M18 13h.01M9 13h6"/></svg>
-            </span>
-            <span class="mode-text"><strong>打字作答</strong><small>看题后输入答案</small></span>
-            <span class="radio" aria-hidden="true"></span>
-          </button>
-          <button class="mode-card" type="button" data-mode="voice" aria-pressed="false">
-            <span class="mode-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 19v3"/></svg>
-            </span>
-            <span class="mode-text"><strong>语音作答</strong><small>看题后说出答案</small></span>
-            <span class="radio" aria-hidden="true"></span>
-          </button>
-        </div>
-        <p id="voice-note" class="note" hidden></p>
-      </div>
+        <fieldset class="field">
+          <legend>题目难度</legend>
+          <div class="levels">
+            <button class="level" type="button" data-level="two" aria-pressed="true">
+              <span class="level-preview">47 <i>+</i> 36</span>
+              <span class="level-label">两位数 ± 两位数</span>
+            </button>
+            <button class="level" type="button" data-level="mixed" aria-pressed="false">
+              <span class="level-preview">385 <i>−</i> 27</span>
+              <span class="level-label">两位 ± 三位</span>
+            </button>
+            <button class="level" type="button" data-level="three" aria-pressed="false">
+              <span class="level-preview">648 <i>+</i> 293</span>
+              <span class="level-label">三位数 ± 三位数</span>
+            </button>
+          </div>
+        </fieldset>
 
-      <div class="group">
-        <h2 class="group-title"><span class="group-num" aria-hidden="true">2</span>题目难度</h2>
-        <div class="difficulty-grid">
-          <button class="difficulty-card selected" type="button" data-level="two" aria-pressed="true">
-            <span class="equation">47 <i>+</i> 36</span>
-            <strong>两位数 ± 两位数</strong>
-            <span class="tag">入门</span>
-          </button>
-          <button class="difficulty-card" type="button" data-level="mixed" aria-pressed="false">
-            <span class="equation">385 <i>−</i> 27</span>
-            <strong>两位数 ± 三位数</strong>
-            <span class="tag">进阶</span>
-          </button>
-          <button class="difficulty-card" type="button" data-level="three" aria-pressed="false">
-            <span class="equation">648 <i>+</i> 293</span>
-            <strong>三位数 ± 三位数</strong>
-            <span class="tag">挑战</span>
-          </button>
-        </div>
-      </div>
+        <fieldset class="field">
+          <legend>题目数量</legend>
+          <div class="segmented" role="group" aria-label="题目数量">
+            <button type="button" data-count="10" aria-pressed="true">10 题</button>
+            <button type="button" data-count="20" aria-pressed="false">20 题</button>
+            <button type="button" data-count="30" aria-pressed="false">30 题</button>
+            <button type="button" data-count="0" aria-pressed="false">不限</button>
+          </div>
+        </fieldset>
 
-      <div class="group">
-        <h2 class="group-title"><span class="group-num" aria-hidden="true">3</span>题目数量</h2>
-        <div class="quantity-grid">
-          <button class="quantity-option selected" type="button" data-count="10" aria-pressed="true">10 题</button>
-          <button class="quantity-option" type="button" data-count="20" aria-pressed="false">20 题</button>
-          <button class="quantity-option" type="button" data-count="30" aria-pressed="false">30 题</button>
-          <button class="quantity-option" type="button" data-count="0" aria-pressed="false">不限</button>
-        </div>
-      </div>
-
-      <button id="start-button" class="primary-button" type="button">开始练习</button>
-      <p class="fine-print">选好一次会记住，下次直接开始。</p>
-    </section>
-
-    <section id="practice" class="panel" aria-labelledby="practice-title" hidden>
-      <h2 id="practice-title" class="sr-only" tabindex="-1">口算练习</h2>
-      <div class="practice-top">
-        <button id="quit-button" class="text-button" type="button">结束这组</button>
-      </div>
-      <div class="progress-row">
-        <span id="progress-label">第 1 / 10 题</span>
-        <span>用时 <span id="timer-label">00:00</span></span>
-      </div>
-      <div class="progress-track"><span id="progress-fill"></span></div>
-
-      <div class="question-area">
-        <div id="question" class="question" aria-live="polite">47 <span>+</span> 36 <span>=</span> ?</div>
-        <p id="feedback" class="feedback" aria-live="polite">输入答案后按确认。</p>
-      </div>
-
-      <form id="answer-form" autocomplete="off">
-        <label class="sr-only" for="answer">输入答案</label>
-        <input id="answer" type="text" inputmode="numeric" enterkeyhint="done" placeholder="输入答案">
-        <button class="primary-button submit-button" type="submit">确认</button>
+        <button class="primary" type="submit">开始练习</button>
+        <p class="fine-print">成绩只保存在这台设备上</p>
       </form>
+    </section>
 
-      <div id="voice-area" hidden>
-        <button id="voice-button" class="voice-button" type="button">
-          <span class="voice-dot" aria-hidden="true"></span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 19v3"/></svg>
-          <span id="voice-label">点按开始说话</span>
+    <section class="view" id="practice" aria-label="口算练习" hidden>
+      <div class="session-bar">
+        <button class="ghost" id="quit-button" type="button">结束</button>
+        <span class="session-meta"><b id="q-index">1</b><span id="q-total">/ 10</span></span>
+        <span class="session-meta">答对 <b id="score-label">0</b> 题</span>
+      </div>
+      <div class="progress" id="progress" role="progressbar" aria-valuemin="0" aria-valuemax="10" aria-valuenow="0" aria-label="练习进度">
+        <span id="progress-fill"></span>
+      </div>
+
+      <div class="stage" id="stage">
+        <div class="equation" id="equation">
+          <span id="eq-left">47</span><span class="op" id="eq-op">+</span><span id="eq-right">36</span><span class="eq">=</span><span class="answer" id="eq-answer" data-state="empty"><span id="answer-text"></span><span class="caret" id="caret" aria-hidden="true"></span></span>
+        </div>
+        <p class="status" id="status" role="status" aria-live="polite"></p>
+      </div>
+
+      <div class="keypad" id="keypad" role="group" aria-label="数字键盘">
+        <button class="key" type="button" data-key="1" aria-label="1">1</button>
+        <button class="key" type="button" data-key="2" aria-label="2">2</button>
+        <button class="key" type="button" data-key="3" aria-label="3">3</button>
+        <button class="key" type="button" data-key="4" aria-label="4">4</button>
+        <button class="key" type="button" data-key="5" aria-label="5">5</button>
+        <button class="key" type="button" data-key="6" aria-label="6">6</button>
+        <button class="key" type="button" data-key="7" aria-label="7">7</button>
+        <button class="key" type="button" data-key="8" aria-label="8">8</button>
+        <button class="key" type="button" data-key="9" aria-label="9">9</button>
+        <button class="key key--minor" type="button" data-key="back" aria-label="删除一位"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h10.5a1.5 1.5 0 0 1 1.5 1.5v11a1.5 1.5 0 0 1-1.5 1.5H9l-5.5-7L9 5Z"/><path d="m12.5 10 4 4M16.5 10l-4 4"/></svg></button>
+        <button class="key" type="button" data-key="0" aria-label="0">0</button>
+        <button class="key key--confirm" type="button" data-key="enter">确认</button>
+      </div>
+
+      <div class="voice" id="voice-ui" hidden>
+        <button class="orb" id="mic-toggle" type="button" aria-pressed="false" aria-label="暂停或继续收音">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5v3"/></svg>
         </button>
-        <p id="voice-hint" class="voice-hint">直接说出答案，例如“八十三”。</p>
-        <p id="heard-text" class="heard-text" aria-live="polite"></p>
-        <button id="voice-fallback" class="text-button fallback" type="button">识别不准？改用打字作答</button>
+        <p class="voice-state" id="voice-state">正在听，请说出答案</p>
+        <p class="heard" id="heard" aria-live="polite"></p>
+        <div class="voice-actions" id="voice-actions" hidden>
+          <button class="mini" id="mic-retry" type="button">重新打开麦克风</button>
+          <button class="mini" id="new-tab" type="button" hidden>在新窗口打开</button>
+        </div>
+        <button class="link" id="switch-mode" type="button">改用键盘作答</button>
       </div>
 
-      <button id="next-button" class="primary-button" type="button" hidden>下一题 →</button>
-      <button id="skip-button" class="text-button skip" type="button">跳过这题</button>
+      <p class="keyboard-hint" id="keyboard-hint" hidden>也可以用键盘数字键输入，回车确认</p>
     </section>
 
-    <section id="results" class="panel" aria-labelledby="results-title" hidden>
-      <h2 id="results-title" tabindex="-1">练习完成</h2>
-      <p id="result-message" class="lead">多练几组，速度和准确率都会上去。</p>
-      <div class="stats">
-        <div class="stat"><strong id="result-correct">0</strong><span>答对</span></div>
-        <div class="stat"><strong id="result-total">0</strong><span>总题数</span></div>
-        <div class="stat"><strong id="result-accuracy">0%</strong><span>正确率</span></div>
-        <div class="stat"><strong id="result-time">00:00</strong><span>总用时</span></div>
-        <div class="stat"><strong id="result-avg">—</strong><span>平均每题</span></div>
-        <div class="stat"><strong id="result-streak">0</strong><span>最高连对</span></div>
+    <section class="view" id="results" aria-label="练习结果" hidden>
+      <div class="card result-card">
+        <p class="result-kicker" id="result-kicker">本组结束</p>
+        <p class="result-score"><b id="r-correct">0</b><span> / <span id="r-total">0</span> 题</span></p>
+        <p class="result-meta"><span id="r-accuracy">0%</span> 正确 · 用时 <span id="r-time">0:00</span> · 平均 <span id="r-avg">0 秒</span></p>
+        <p class="result-note" id="result-note"></p>
+        <ul class="mistakes" id="mistakes" hidden></ul>
+        <button class="primary" id="again-button" type="button">再来一组</button>
+        <button class="link" id="settings-button" type="button">调整设置</button>
       </div>
-      <p id="best-line" class="best-line" hidden></p>
-
-      <div id="wrong-section" hidden>
-        <h3 id="wrong-title">答错的题</h3>
-        <ul id="wrong-list" class="wrong-list"></ul>
-      </div>
-
-      <button id="again-button" class="primary-button" type="button">再练一组</button>
-      <button id="review-button" class="secondary-button" type="button" hidden>重练错题</button>
-      <button id="settings-button" class="text-button settings-link" type="button">返回设置</button>
     </section>
+  </div>
 
-    <footer class="footer">成绩只保存在本机</footer>
-  </main>
   <script src="app.js" defer></script>
 </body>
 </html>
