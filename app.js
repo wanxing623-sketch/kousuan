@@ -11,17 +11,18 @@
   const REQUIRED_IDS = ['setup', 'practice', 'results', 'answer-form', 'question', 'voice-button'];
   const domMatches = REQUIRED_IDS.every((id) => document.getElementById(id));
   if (!domMatches) {
-    if (!new URLSearchParams(location.search).has('fresh')) {
-      const url = new URL(location.href);
-      url.searchParams.set('fresh', Date.now().toString(36));
-      location.replace(url.toString());
+    if (location.search.indexOf('fresh=') === -1) {
+      const base = location.href.split('#')[0];
+      const joiner = base.indexOf('?') === -1 ? '?' : '&';
+      location.replace(`${base}${joiner}fresh=${Date.now().toString(36)}`);
       return;
     }
     document.body.insertAdjacentHTML(
       'afterbegin',
-      '<p style="margin:0;padding:14px 18px;background:#fff0e9;color:#a03c1c;font:14px/1.6 -apple-system,sans-serif">'
-      + '页面缓存还是旧版本。请强制刷新一次：手机上关掉标签页重新打开，桌面上按 Ctrl / Cmd + Shift + R。'
-      + '</p>'
+      '<div style="margin:0;padding:14px 18px;background:#fff0e9;color:#a03c1c;font:14px/1.6 -apple-system,sans-serif">'
+      + '页面缓存还是旧版本。<a href="' + location.pathname + '?reload=' + Date.now() + '" '
+      + 'style="color:#a03c1c;font-weight:700">点这里重新加载</a> 即可。'
+      + '</div>'
     );
     return;
   }
@@ -31,6 +32,12 @@
   const LEVEL_LABELS = { two: '两位数 ± 两位数', mixed: '两位数 ± 三位数', three: '三位数 ± 三位数' };
 
   const el = (id) => document.getElementById(id);
+
+  /* 旧版 Safari 的 classList.toggle 不支持第二个参数，这里显式区分 */
+  function setClass(node, name, on) {
+    if (on) node.classList.add(name);
+    else node.classList.remove(name);
+  }
 
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   const supportsSpeech = Boolean(Recognition);
@@ -56,16 +63,16 @@
     const raw = localStorage.getItem(STORE_KEY);
     if (raw) {
       const data = JSON.parse(raw);
-      if (data && data.prefs) prefs = { ...defaults, ...data.prefs };
+      if (data && data.prefs) prefs = Object.assign({}, defaults, data.prefs);
       if (data && data.best) best = data.best;
     }
   } catch (_) {
     /* 无痕模式或数据损坏：用默认值 */
   }
 
-  if (!['type', 'voice'].includes(prefs.mode)) prefs.mode = defaults.mode;
-  if (!['two', 'mixed', 'three'].includes(prefs.level)) prefs.level = defaults.level;
-  if (![0, 10, 20, 30].includes(prefs.count)) prefs.count = defaults.count;
+  if (['type', 'voice'].indexOf(prefs.mode) === -1) prefs.mode = defaults.mode;
+  if (['two', 'mixed', 'three'].indexOf(prefs.level) === -1) prefs.level = defaults.level;
+  if ([0, 10, 20, 30].indexOf(prefs.count) === -1) prefs.count = defaults.count;
   if (!supportsSpeech) prefs.mode = 'type';
 
   function persist() {
@@ -83,17 +90,17 @@
   function syncSetup() {
     document.querySelectorAll('[data-mode]').forEach((button) => {
       const on = button.dataset.mode === prefs.mode;
-      button.classList.toggle('selected', on);
+      setClass(button, 'selected', on);
       button.setAttribute('aria-pressed', String(on));
     });
     document.querySelectorAll('[data-level]').forEach((button) => {
       const on = button.dataset.level === prefs.level;
-      button.classList.toggle('selected', on);
+      setClass(button, 'selected', on);
       button.setAttribute('aria-pressed', String(on));
     });
     document.querySelectorAll('[data-count]').forEach((button) => {
       const on = Number(button.dataset.count) === prefs.count;
-      button.classList.toggle('selected', on);
+      setClass(button, 'selected', on);
       button.setAttribute('aria-pressed', String(on));
     });
     el('voice-tip').hidden = !(prefs.mode === 'voice' && supportsSpeech);
@@ -265,7 +272,7 @@
     if (prefs.mode === 'voice') {
       resumeVoice();
     } else if (finePointer) {
-      el('answer').focus({ preventScroll: true });
+      el('answer').focus();
     }
   }
 
@@ -302,7 +309,7 @@
     if (correct) {
       session.correct += 1;
     } else {
-      session.mistakes.push({ ...question, given: value });
+      session.mistakes.push(Object.assign({}, question, { given: value }));
     }
 
     if (prefs.mode === 'voice') pauseVoice();
@@ -316,7 +323,12 @@
   }
 
   function submitTyped() {
-    if (locked || view !== 'practice') return;
+    if (view !== 'practice') return;
+    if (locked) {
+      /* 反馈还没结束就再点确认：当作「下一题」 */
+      advanceNow();
+      return;
+    }
     const raw = el('answer').value.trim();
     if (!raw) {
       nudge('先输入答案');
@@ -341,7 +353,7 @@
     question.classList.remove('shake');
     void question.offsetWidth;
     question.classList.add('shake');
-    if (prefs.mode === 'type' && finePointer) el('answer').focus({ preventScroll: true });
+    if (prefs.mode === 'type' && finePointer) el('answer').focus();
   }
 
   function setFeedback(text, kind = '') {
@@ -414,8 +426,9 @@
         const mine = document.createElement('span');
         mine.className = 'mine';
         mine.textContent = `你答 ${item.given}`;
-        li.append(equation, mine);
-        list.append(li);
+        li.appendChild(equation);
+        li.appendChild(mine);
+        list.appendChild(li);
       });
       list.hidden = false;
     } else {
@@ -440,7 +453,7 @@
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
     if (minutes === 0) return `${seconds} 秒`;
-    return `${minutes} 分 ${String(seconds).padStart(2, '0')} 秒`;
+    return `${minutes} 分 ${(seconds < 10 ? '0' : '') + seconds} 秒`;
   }
 
   function showView(next) {
@@ -839,10 +852,10 @@
 
   function setVoiceState(state) {
     const button = el('voice-button');
-    button.classList.toggle('is-listening', state === 'listening');
-    button.classList.toggle('is-thinking', state === 'thinking');
-    button.classList.toggle('is-paused', state === 'paused');
-    button.classList.toggle('is-blocked', state === 'blocked');
+    setClass(button, 'is-listening', state === 'listening');
+    setClass(button, 'is-thinking', state === 'thinking');
+    setClass(button, 'is-paused', state === 'paused');
+    setClass(button, 'is-blocked', state === 'blocked');
     button.setAttribute('aria-pressed', String(state === 'listening'));
     setVoiceLabel(VOICE_LABELS[state] || VOICE_LABELS.idle);
   }
@@ -903,7 +916,7 @@
     applyModeLayout();
     el('feedback').className = 'feedback';
     setFeedback('已改用打字作答', '');
-    el('answer').focus({ preventScroll: true });
+    el('answer').focus();
   });
 
   document.addEventListener('visibilitychange', () => {
@@ -943,4 +956,5 @@
   /* ------------------------------------------------------------------ */
 
   syncSetup();
+  window.kousuanReady = true;
 })();
