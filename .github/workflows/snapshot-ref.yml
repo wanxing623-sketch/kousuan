@@ -23,7 +23,7 @@ jobs:
             --virtual-time-budget=8000 \
             --screenshot=.snapshot/ref-mobile.png \
             "https://01a1e914-01ee-7b69-8eb4-18988b026c39.arena.site/" || true
-          curl -sSL "https://01a1e914-01ee-7b69-8eb4-18988b026c39.arena.site/" -o .snapshot/ref.html || true
+          curl -sSL "https://01a1e914-01ee-7b69-8eb4-18988b026c39.arena.site/?embed=true" -o .snapshot/ref-embed.html || true
           ls -la .snapshot
       - name: Screenshot reference (desktop)
         run: |
