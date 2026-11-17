@@ -21,6 +21,8 @@
   let locked = false;
   let buffer = '';
   let advanceTimer = 0;
+  let awayMs = 0;
+  let awaySince = 0;
 
   /* ------------------------------------------------------------------ *
    * stored settings
@@ -178,6 +180,8 @@
     clearTimeout(advanceTimer);
     buffer = '';
     locked = false;
+    awayMs = 0;
+    awaySince = document.hidden ? performance.now() : 0;
     session = {
       index: 0,
       answered: 0,
@@ -330,7 +334,9 @@
     }
 
     const accuracy = Math.round((session.correct / session.answered) * 100);
-    const seconds = Math.max(1, Math.round((performance.now() - session.startedAt) / 1000));
+    const now = performance.now();
+    const away = awayMs + (awaySince ? now - awaySince : 0);
+    const seconds = Math.max(1, Math.round((now - session.startedAt - away) / 1000));
     const previous = best[prefs.level];
     const isRecord = !previous || accuracy > previous.accuracy;
 
@@ -487,6 +493,7 @@
   let restartTimer = 0;
   let micProblem = null;
   let hasStarted = false;
+  let silenceCount = 0;
 
   const CN_DIGITS = {
     '零': 0, '〇': 0, '一': 1, '壹': 1, '幺': 1, '二': 2, '贰': 2, '两': 2, '俩': 2,
@@ -594,6 +601,7 @@
         const result = event.results[i];
         const text = (result[0].transcript || '').trim();
         if (!text) continue;
+        silenceCount = 0;
         el('heard').textContent = text;
 
         if (!result.isFinal) continue;
@@ -611,7 +619,12 @@
     instance.onerror = (event) => {
       const code = event && event.error;
       if (code === 'no-speech') {
-        setStatus('没听到声音，再说一次', 'bad');
+        silenceCount += 1;
+        if (silenceCount >= 3) {
+          pausePrompt('有一会儿没听到声音，点一下继续', '继续收音');
+        } else {
+          setStatus('没听到声音，再说一次', 'bad');
+        }
         return;
       }
       if (code === 'aborted') return;
@@ -653,6 +666,7 @@
   function startVoice() {
     if (!Recognition) return;
     wantListen = true;
+    silenceCount = 0;
     paused = false;
     micProblem = null;
     el('heard').textContent = '';
@@ -725,15 +739,29 @@
     setOrb('idle');
   }
 
-  function needsTap() {
+  /* 需要用户点一下才能继续收音（Safari 手势限制、长时间静默） */
+  function pausePrompt(message, label) {
     wantListen = true;
     paused = true;
-    micProblem = 'tap';
+    micProblem = 'prompt';
     clearTimeout(restartTimer);
+    if (recognition && isListening) {
+      try {
+        recognition.abort();
+      } catch (_) {
+        /* already stopped */
+      }
+    }
+    isListening = false;
     setOrb('paused');
-    setVoiceState('浏览器需要你点一下「重新打开麦克风」才能继续');
+    setVoiceState(message);
+    el('mic-retry').textContent = label;
     el('voice-actions').hidden = false;
     el('new-tab').hidden = !inFrame;
+  }
+
+  function needsTap() {
+    pausePrompt('浏览器需要你点一下才能继续收音', '继续收音');
   }
 
   function failVoice(kind, message) {
@@ -751,6 +779,7 @@
     isListening = false;
     setOrb('blocked');
     setVoiceState(message);
+    el('mic-retry').textContent = '重新打开麦克风';
     el('voice-actions').hidden = false;
     el('new-tab').hidden = !inFrame;
   }
@@ -795,6 +824,7 @@
     micProblem = null;
     wantListen = true;
     paused = false;
+    silenceCount = 0;
     el('voice-actions').hidden = true;
     setVoiceState('正在打开麦克风…');
     listen();
@@ -824,6 +854,7 @@
 
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
+      if (view === 'practice') awaySince = performance.now();
       if (isListening) {
         paused = true;
         try {
@@ -832,7 +863,14 @@
           /* already stopped */
         }
       }
-    } else if (view === 'practice' && prefs.mode === 'voice' && wantListen && !locked && !micProblem) {
+      return;
+    }
+
+    if (awaySince) {
+      awayMs += performance.now() - awaySince;
+      awaySince = 0;
+    }
+    if (view === 'practice' && prefs.mode === 'voice' && wantListen && !locked && !micProblem) {
       paused = false;
       listen();
     }
