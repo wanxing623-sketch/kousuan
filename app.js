@@ -373,7 +373,7 @@
     voiceButton.disabled = true;
     nextButton.hidden = false;
     $('#skip-button').hidden = true;
-    if (mode === 'typing') {
+    if (!answerForm.hidden) {
       // 键盘保持打开，再按一次回车即可进入下一题
       answerInput.focus({ preventScroll: true });
     } else {
