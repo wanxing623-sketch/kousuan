@@ -70,6 +70,7 @@
   let recognition = null;
   let listening = false;
   let wantListening = false;
+  let silenceCount = 0;
 
   if (recognitionAvailable) {
     recognition = new SpeechRecognition();
@@ -98,9 +99,10 @@
     heardEl.textContent = text ? `听到：${text}` : '';
     const value = parseSpokenNumber(text);
     if (value === null) {
-      setFeedback('没听清数字，请再说一次。', 'bad');
+      noteSilence('没听清数字，请再说一次。');
       return; // onend 会自动继续聆听
     }
+    silenceCount = 0;
     answerInput.value = String(value);
     checkAnswer(value);
     stopListening(); // 判定后立即停止收音
@@ -109,7 +111,7 @@
   function onSpeechError(event) {
     if (event.error === 'aborted') return;
     if (event.error === 'no-speech') {
-      setFeedback('没听清，请再说一次。', 'bad');
+      noteSilence('没听清，请再说一次。');
       return; // onend 会自动继续聆听
     }
     wantListening = false;
@@ -120,6 +122,16 @@
       network: '语音识别需要联网，请检查网络后重试。',
     };
     setFeedback(messages[event.error] || '语音识别暂不可用，请点按按钮重试，或改用打字作答。', 'bad');
+  }
+
+  function noteSilence(message) {
+    silenceCount += 1;
+    if (silenceCount >= 3) {
+      wantListening = false;
+      setFeedback('多次没听到答案，已暂停聆听。点按钮可以继续。', 'bad');
+      return;
+    }
+    setFeedback(message, 'bad');
   }
 
   function onSpeechEnd() {
@@ -233,8 +245,13 @@
   }
 
   function updateModeUI() {
-    answerForm.hidden = mode !== 'typing';
+    const voiceUsable = mode === 'voice' && recognitionAvailable;
+    // 语音模式但浏览器不支持时，直接露出输入框，少一步折腾
+    answerForm.hidden = mode !== 'typing' && recognitionAvailable;
     voiceArea.hidden = mode !== 'voice';
+    voiceButton.hidden = !voiceUsable;
+    $('#voice-hint').hidden = !voiceUsable;
+    $('#voice-fallback').hidden = !voiceUsable;
     nextButton.hidden = !awaitingNext;
     updateVoiceButton();
   }
@@ -306,9 +323,11 @@
     } else if (recognitionAvailable) {
       setFeedback('请说出答案。');
       wantListening = true;
+      silenceCount = 0;
       startListening();
     } else {
-      setFeedback('当前浏览器不支持语音识别，请改用打字作答。', 'bad');
+      setFeedback('这个浏览器不支持语音识别，直接输入答案就行。', 'bad');
+      answerInput.focus({ preventScroll: true });
     }
   }
 
@@ -652,6 +671,7 @@
       stopListening();
     } else {
       wantListening = true;
+      silenceCount = 0;
       startListening();
     }
   });
