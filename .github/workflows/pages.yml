@@ -3,6 +3,7 @@ name: Deploy website to GitHub Pages
 on:
   push:
     branches:
+      - main
       - arena/ccf60f35-kousuan
   workflow_dispatch:
 
