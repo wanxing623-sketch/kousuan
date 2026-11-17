@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f8fb">
+  <meta name="description" content="两位数、三位数的加减法口算练习，支持键盘输入与语音作答。">
+  <title>速算练习</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="速算练习">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <!--@styles-->
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="速算练习">
+        <span class="brand-mark" aria-hidden="true">＋</span>
+        <span>速算练习</span>
+      </a>
+    </header>
+
+    <section id="setup" class="panel setup-panel" aria-label="练习设置">
+      <fieldset class="setting-group">
+        <legend>练习方式</legend>
+        <div class="mode-grid">
+          <button class="mode-card selected" type="button" data-mode="type" aria-pressed="true">
+            <span class="mode-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6.5 10h.01M10 10h.01M13.5 10h.01M17 10h.01M6.5 13.5h.01M17 13.5h.01M9.5 13.5h5"/></svg>
+            </span>
+            <span class="mode-copy"><strong>打字作答</strong><small>看题后用数字键输入</small></span>
+            <span class="radio-dot" aria-hidden="true"></span>
+          </button>
+          <button class="mode-card" type="button" data-mode="voice" aria-pressed="false">
+            <span class="mode-icon voice-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5v3"/></svg>
+            </span>
+            <span class="mode-copy"><strong>语音作答</strong><small>看题后直接说出答案</small></span>
+            <span class="radio-dot" aria-hidden="true"></span>
+          </button>
+        </div>
+        <p class="support-note" id="voice-note" hidden>这个浏览器不支持语音识别，先用打字作答也可以。</p>
+        <p class="support-note tip" id="voice-tip" hidden>开始后请允许麦克风，说完答案会自动进入下一题。</p>
+      </fieldset>
+
+      <fieldset class="setting-group">
+        <legend>题目难度</legend>
+        <div class="difficulty-grid">
+          <button class="difficulty-card selected" type="button" data-level="two" aria-pressed="true">
+            <span class="equation-preview">47 <i>+</i> 36</span>
+            <strong>两位数 ± 两位数</strong>
+          </button>
+          <button class="difficulty-card" type="button" data-level="mixed" aria-pressed="false">
+            <span class="equation-preview">385 <i>−</i> 27</span>
+            <strong>两位数 ± 三位数</strong>
+          </button>
+          <button class="difficulty-card" type="button" data-level="three" aria-pressed="false">
+            <span class="equation-preview">648 <i>+</i> 293</span>
+            <strong>三位数 ± 三位数</strong>
+          </button>
+        </div>
+      </fieldset>
+
+      <fieldset class="setting-group quantity-group">
+        <legend>题目数量</legend>
+        <div class="quantity-options" role="group" aria-label="题目数量">
+          <button class="quantity-option selected" type="button" data-count="10" aria-pressed="true">10 <small>题</small></button>
+          <button class="quantity-option" type="button" data-count="20" aria-pressed="false">20 <small>题</small></button>
+          <button class="quantity-option" type="button" data-count="30" aria-pressed="false">30 <small>题</small></button>
+          <button class="quantity-option" type="button" data-count="0" aria-pressed="false">不限</button>
+        </div>
+      </fieldset>
+
+      <button id="start-button" class="primary-button" type="button">
+        <span>开始练习</span><span class="button-arrow" aria-hidden="true">→</span>
+      </button>
+    </section>
+
+    <section id="practice" class="panel practice-panel" aria-label="口算练习" hidden>
+      <div class="practice-topline">
+        <button id="back-button" class="text-button" type="button"><span aria-hidden="true">←</span> 练习设置</button>
+        <button id="quit-button" class="quit-button" type="button">结束练习</button>
+      </div>
+      <div class="progress-row">
+        <span id="progress-label">第 1 题</span>
+        <span id="score-label">答对 0 题</span>
+      </div>
+      <div class="progress-track"><span id="progress-fill"></span></div>
+
+      <div class="question-area">
+        <span class="question-kicker">请计算</span>
+        <div id="question" class="question" aria-live="polite">47 <span>+</span> 36 <span>=</span> ?</div>
+        <div id="feedback" class="feedback" role="status" aria-live="polite">仔细想一想，输入你的答案</div>
+
+        <form id="answer-form" autocomplete="off" novalidate>
+          <label class="sr-only" for="answer">输入答案</label>
+          <input id="answer" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="输入答案" autocomplete="off" enterkeyhint="done">
+          <button class="submit-button" type="submit">确认答案 <span aria-hidden="true">↗</span></button>
+        </form>
+
+        <div id="voice-area" class="voice-area" hidden>
+          <button id="voice-button" class="voice-button" type="button" aria-pressed="false">
+            <span class="voice-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5v3"/></svg>
+            </span>
+            <span id="voice-label">正在聆听…</span>
+          </button>
+          <p id="heard-text" class="heard-text" aria-live="polite"></p>
+          <p id="voice-hint" class="voice-hint">说完答案会自动进入下一题，点麦克风可暂停</p>
+          <div id="voice-actions" class="voice-actions" hidden>
+            <button id="voice-retry" class="mini-button" type="button">重新打开麦克风</button>
+            <button id="new-tab" class="mini-button" type="button" hidden>在新窗口打开</button>
+          </div>
+          <button id="switch-mode" class="voice-switch" type="button">改用打字作答</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="results" class="panel results-panel" aria-label="练习结果" hidden>
+      <div class="result-icon" aria-hidden="true">✦</div>
+      <h2>练习完成！</h2>
+      <p id="result-message">太棒了，今天又进步了一点。</p>
+      <div class="result-stats">
+        <div><strong id="result-correct">0</strong><span>答对题数</span></div>
+        <div><strong id="result-total">0</strong><span>完成题数</span></div>
+        <div><strong id="result-accuracy">0%</strong><span>正确率</span></div>
+      </div>
+      <p class="result-meta">用时 <span id="result-time">0 秒</span> · 平均每题 <span id="result-avg">0 秒</span></p>
+      <ul id="mistakes" class="mistakes" hidden></ul>
+      <button id="again-button" class="primary-button" type="button">
+        <span>再练一组</span><span class="button-arrow" aria-hidden="true">→</span>
+      </button>
+      <button id="settings-button" class="text-button settings-link" type="button">返回设置</button>
+    </section>
+  </main>
+
+  <!--@app-->
+  <script>
+    (function () {
+      var reported = false;
+
+      function strip(text) {
+        var box = document.createElement('div');
+        box.style.cssText = 'margin:0 0 12px;padding:12px 16px;border-radius:10px;'
+          + 'background:#fff0e9;color:#a03c1c;font:13px/1.55 -apple-system,BlinkMacSystemFont,'
+          + '"PingFang SC",sans-serif';
+        var msg = document.createElement('span');
+        msg.textContent = text;
+        box.appendChild(msg);
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = '重新加载';
+        btn.style.cssText = 'display:block;margin-top:8px;padding:6px 14px;border:0;border-radius:7px;'
+          + 'background:#f47b50;color:#fff;font:inherit;font-weight:700';
+        btn.onclick = function () {
+          var base = location.href.split('#')[0];
+          var sep = base.indexOf('?') === -1 ? '?' : '&';
+          location.href = base + sep + 'reload=' + new Date().getTime();
+        };
+        box.appendChild(btn);
+        document.body.insertBefore(box, document.body.firstChild);
+      }
+
+      function report(text) {
+        if (reported) return;
+        reported = true;
+        strip(text);
+      }
+
+      window.onerror = function (message, source, line) {
+        report('页面出错了：' + message + '（第 ' + (line || '?') + ' 行）');
+      };
+      window.addEventListener('unhandledrejection', function (event) {
+        report('页面出错了：' + (event && event.reason ? event.reason : '未知错误'));
+      });
+
+      function check() {
+        if (window.kousuanReady) return;
+        report('页面的脚本没有运行，所以按钮点了没有反应。可能是浏览器版本太旧'
+          + '（建议 iOS / iPadOS 12 以上），也可能是页面没有下载完整。');
+      }
+
+      if (document.readyState === 'complete') setTimeout(check, 900);
+      else window.addEventListener('load', function () { setTimeout(check, 900); });
+    })();
+  </script>
+  <noscript>
+    <p style="margin:0;padding:14px 18px;background:#fff0e9;color:#a03c1c;font:14px/1.6 sans-serif">
+      需要开启 JavaScript 才能答题，请在浏览器设置里允许脚本后重新打开。
+    </p>
+  </noscript>
+</body>
+</html>

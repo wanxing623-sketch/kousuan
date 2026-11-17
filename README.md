@@ -2,7 +2,9 @@
 
 打开就能用的加减法口算练习页。两位数、三位数都能练，可以按数字答题，也可以看着题直接说出答案。
 
-没有框架、没有构建步骤、没有依赖，只有 `index.html`、`styles.css`、`app.js` 三个文件。
+线上只有 **一个文件**：`index.html`。样式和脚本都在里面内联着，没有任何外部请求。
+
+这么做是刻意的。这个页面被反复报「打开后点不动」，而每次的原因都是同一类：浏览器拿到的新页面配了旧的 `app.js`／`styles.css`，或者那个 `.js` 请求被拦掉了。合成一个文件之后，这种新旧混搭在物理上不可能发生。
 
 ## 功能
 
@@ -42,23 +44,41 @@
 ## 兼容性
 
 - 建议 iOS / iPadOS 12 以上、Chrome / Edge / Safari 近几年的版本。
-- 脚本语法已避开较新的写法，iOS 10.3 起应该能跑；更旧的系统上，页面顶部会直接显示「脚本没有运行，点这里重新加载」，而不是让你对着点不动的按钮猜。
-- 布局关键间距不再依赖 flex 的 `gap`（Safari 14.5 之前不支持），旧 iPad 上不会挤在一起。
+- 脚本语法已避开较新的写法（对象展开、`URLSearchParams`、`padStart`、`classList.toggle` 的第二个参数等），iOS 10.3 起应该能跑。
+- 布局关键间距不依赖 flex 的 `gap`（Safari 14.5 之前不支持），旧 iPad 上不会挤在一起；`min()` / `env()` 都有 px 回退。
+- **出问题会说话**：脚本没跑起来、或者运行中报错，页面顶部会直接显示原因和「重新加载」按钮，而不是让你对着点不动的按钮猜。
 
 ## 本地运行
 
-直接用浏览器打开 `index.html` 即可。语音识别建议用本地服务器：
-
 ```sh
+python3 build.py     # 把 src/ 里的样式和脚本内联进 index.html
 python3 -m http.server 8000
 ```
 
-然后访问 <http://localhost:8000>。
+然后访问 <http://localhost:8000>（语音识别需要 localhost 或 HTTPS）。
+
+## 改代码
+
+```
+src/page.html    页面结构（含兜底提示脚本）
+src/styles.css   样式
+src/app.js       逻辑
+build.py         生成单文件 index.html（产物要一起提交）
+```
+
+改完跑一下回归：
+
+```sh
+python3 build.py
+cd .test && npm i && node test.js
+```
+
+覆盖：三项设置切换与记忆、打字全流程与结果统计、空答案、回车、语音连续作答、
+同音字与口语句识别、静默暂停、麦克风被拒、不支持语音的降级、29 组数字解析、
+以及「结构对不上」「脚本跑不起来」两种兜底提示。
 
 ## 发布到 GitHub Pages
 
-> 发布前把 `index.html` 里 `styles.css?v=` 和 `app.js?v=` 的版本号改一下（例如 `20261119b`）。
-> GitHub Pages 的 HTML 会缓存 10 分钟，带版本号可以避免用户遇到「新页面配旧脚本」的错乱状态；
-> `app.js` 开头还有一层自检，发现页面结构对不上时会自动重新取一次页面。
+先 `python3 build.py` 生成 `index.html`，再提交。单文件之后不需要再手动改版本号，也不需要担心缓存错乱。
 
 在仓库 **Settings → Pages** 中把发布来源设为 `Deploy from a branch`，选择默认分支和 `/ (root)`。仓库里的 `.github/workflows/pages.yml` 也会在推送到 `main` 时自动部署。
