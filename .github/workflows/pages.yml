@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - arena/ccf60f35-kousuan
+      - arena/8ffadef5-kousuan
   workflow_dispatch:
 
 permissions:
