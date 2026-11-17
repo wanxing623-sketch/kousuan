@@ -1,6 +1,31 @@
 (() => {
   'use strict';
 
+  /* ------------------------------------------------------------------ *
+   * 版本自检
+   * 部署刚完成时，浏览器可能拿到「新 HTML + 旧脚本」或反过来的组合。
+   * 旧脚本对着新页面会一上来就报错，表现为所有按钮都点不动。
+   * 这里先确认页面结构对得上；对不上就换成带查询参数的新地址重新取一次。
+   * ------------------------------------------------------------------ */
+
+  const REQUIRED_IDS = ['setup-form', 'practice', 'keypad', 'eq-answer', 'voice-ui'];
+  const domReady = REQUIRED_IDS.every((id) => document.getElementById(id));
+  if (!domReady) {
+    if (!new URLSearchParams(location.search).has('fresh')) {
+      const url = new URL(location.href);
+      url.searchParams.set('fresh', Date.now().toString(36));
+      location.replace(url.toString());
+      return;
+    }
+    document.body.insertAdjacentHTML(
+      'afterbegin',
+      '<p style="margin:0;padding:14px 18px;background:#fdf0e7;color:#8a3d1c;font:14px/1.6 -apple-system,sans-serif">'
+      + '页面缓存还是旧版本。请强制刷新一次：手机上关掉标签页重新打开，桌面上按 Ctrl / Cmd + Shift + R。'
+      + '</p>'
+    );
+    return;
+  }
+
   const STORE_KEY = 'kousuan:v1';
   const MINUS = '−';
 

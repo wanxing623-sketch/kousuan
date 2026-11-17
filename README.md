@@ -49,4 +49,8 @@ python3 -m http.server 8000
 
 ## 发布到 GitHub Pages
 
+> 发布前把 `index.html` 里 `styles.css?v=` 和 `app.js?v=` 的版本号改一下（例如 `20261118b`）。
+> GitHub Pages 的 HTML 会缓存 10 分钟，带版本号可以避免用户遇到「新页面配旧脚本」的错乱状态；
+> `app.js` 开头还有一层自检，发现页面结构对不上时会自动重新取一次页面。
+
 在仓库 **Settings → Pages** 中把发布来源设为 `Deploy from a branch`，选择默认分支和 `/ (root)`。仓库里的 `.github/workflows/pages.yml` 也会在推送到 `main` 时自动部署。
