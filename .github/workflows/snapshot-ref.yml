@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   snapshot:
@@ -15,30 +15,27 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Fetch reference html
-        run: |
-          mkdir -p ref
-          curl -sSL "https://01a1e914-01ee-7b69-8eb4-18988b026c39.arena.site/" -o ref/ref.html || true
-          wc -c ref/ref.html
       - name: Screenshot reference (mobile)
         run: |
-          google-chrome --version
+          mkdir -p .snapshot
           google-chrome --headless=new --no-sandbox --disable-gpu --hide-scrollbars \
             --window-size=390,844 --force-device-scale-factor=2 \
-            --virtual-time-budget=6000 \
-            --screenshot=ref/ref-mobile.png \
+            --virtual-time-budget=8000 \
+            --screenshot=.snapshot/ref-mobile.png \
             "https://01a1e914-01ee-7b69-8eb4-18988b026c39.arena.site/" || true
-          ls -la ref
+          curl -sSL "https://01a1e914-01ee-7b69-8eb4-18988b026c39.arena.site/" -o .snapshot/ref.html || true
+          ls -la .snapshot
       - name: Screenshot reference (desktop)
         run: |
           google-chrome --headless=new --no-sandbox --disable-gpu --hide-scrollbars \
             --window-size=1280,900 \
-            --virtual-time-budget=6000 \
-            --screenshot=ref/ref-desktop.png \
+            --virtual-time-budget=8000 \
+            --screenshot=.snapshot/ref-desktop.png \
             "https://01a1e914-01ee-7b69-8eb4-18988b026c39.arena.site/" || true
-      - name: Upload snapshot
-        uses: actions/upload-artifact@v4
-        with:
-          name: reference-snapshot
-          path: ref
-          retention-days: 1
+      - name: Commit snapshot back to branch
+        run: |
+          git config user.name "snapshot-bot"
+          git config user.email "snapshot@example.com"
+          git add -f .snapshot
+          git commit -m "snapshot: reference site screenshots" || true
+          git push origin HEAD:arena/a55d433e-kousuan || true
