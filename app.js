@@ -57,6 +57,7 @@
     document.querySelectorAll('[data-mode]').forEach((button) => {
       button.setAttribute('aria-pressed', String(button.dataset.mode === prefs.mode));
     });
+    el('voice-tip').hidden = !(prefs.mode === 'voice' && supportsSpeech);
     document.querySelectorAll('[data-level]').forEach((button) => {
       button.setAttribute('aria-pressed', String(button.dataset.level === prefs.level));
     });
@@ -113,7 +114,7 @@
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
 
-  function buildQuestion() {
+  function draftQuestion() {
     const twoDigit = () => randomInt(10, 99);
     const threeDigit = () => randomInt(100, 999);
     let a;
@@ -136,13 +137,24 @@
     }
 
     const op = Math.random() < 0.5 ? '+' : MINUS;
-    if (op === MINUS) {
-      if (b > a) [a, b] = [b, a];
-      if (a === b) return buildQuestion();
-    }
+    if (op === MINUS && b > a) [a, b] = [b, a];
 
     const answer = op === '+' ? a + b : a - b;
     return { a, b, op, answer };
+  }
+
+  /* 40 + 60、300 - 300 这类题目没有练习价值，换一题 */
+  function isBoring({ a, b, op, answer }) {
+    if (a % 10 === 0 && b % 10 === 0) return true;
+    return op === MINUS && answer === 0;
+  }
+
+  function buildQuestion() {
+    for (let i = 0; i < 8; i += 1) {
+      const question = draftQuestion();
+      if (!isBoring(question)) return question;
+    }
+    return draftQuestion();
   }
 
   function nextQuestionData() {
@@ -474,6 +486,7 @@
   let paused = false;
   let restartTimer = 0;
   let micProblem = null;
+  let hasStarted = false;
 
   const CN_DIGITS = {
     '零': 0, '〇': 0, '一': 1, '壹': 1, '幺': 1, '二': 2, '贰': 2, '两': 2, '俩': 2,
@@ -569,6 +582,8 @@
 
     instance.onstart = () => {
       isListening = true;
+      hasStarted = true;
+      micProblem = null;
       setOrb('listening');
       if (!locked) setVoiceState('正在听，请说出答案');
     };
@@ -659,6 +674,11 @@
         scheduleRestart(320);
         return;
       }
+      /* Safari only allows start() from a fresh tap after the first run */
+      if (error && (error.name === 'NotAllowedError' || error.name === 'SecurityError') && hasStarted) {
+        needsTap();
+        return;
+      }
       failVoice('blocked', '麦克风没有打开。允许权限后重试，或改用键盘。');
     }
   }
@@ -703,6 +723,17 @@
     }
     isListening = false;
     setOrb('idle');
+  }
+
+  function needsTap() {
+    wantListen = true;
+    paused = true;
+    micProblem = 'tap';
+    clearTimeout(restartTimer);
+    setOrb('paused');
+    setVoiceState('浏览器需要你点一下「重新打开麦克风」才能继续');
+    el('voice-actions').hidden = false;
+    el('new-tab').hidden = !inFrame;
   }
 
   function failVoice(kind, message) {
@@ -784,6 +815,7 @@
     stopVoice();
     applyModeLayout();
     el('voice-actions').hidden = true;
+    micProblem = null;
     setStatus('已切换为键盘作答');
     if (!locked) {
       el('eq-answer').dataset.state = buffer ? 'filled' : 'empty';
