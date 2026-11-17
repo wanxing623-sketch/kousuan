@@ -1,225 +1,153 @@
 (() => {
   'use strict';
 
-  const $ = (selector) => document.querySelector(selector);
-  const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+  const $ = (sel) => document.querySelector(sel);
 
   const setupEl = $('#setup');
   const practiceEl = $('#practice');
   const resultsEl = $('#results');
-  const answerForm = $('#answer-form');
+  const dock = $('#dock');
+  const startBtn = $('#start-button');
+  const dockTyping = $('#dock-typing');
   const answerInput = $('#answer');
-  const voiceArea = $('#voice-area');
-  const voiceButton = $('#voice-button');
-  const voiceLabel = $('#voice-label');
-  const heardEl = $('#heard-text');
-  const feedbackEl = $('#feedback');
+  const submitBtn = $('#submit-button');
+  const micBtn = $('#mic-button');
+  const micLabel = $('#mic-label');
+  const againBtn = $('#again-button');
+  const backBtn = $('#settings-button');
   const questionEl = $('#question');
+  const feedbackEl = $('#feedback');
+  const heardEl = $('#heard');
   const progressLabel = $('#progress-label');
-  const progressFill = $('#progress-fill');
-  const timerEl = $('#timer-label');
-  const nextButton = $('#next-button');
+  const progressBar = $('#progress-bar');
+  const timerLabel = $('#timer-label');
   const voiceNote = $('#voice-note');
+  const voiceLoading = $('#voice-loading');
+  const voiceLoadingText = $('#voice-loading-text');
+  const voiceLoadingBar = $('#voice-loading .loading-bar span');
+  const skipBtn = $('#skip-button');
+  const quitBtn = $('#quit-button');
+  const switchTypingBtn = $('#switch-typing');
 
-  const SETTINGS_KEY = 'kousuan:settings:v1';
-  const BEST_KEY = 'kousuan:best:v2';
-  const BEST_LABELS = { two: '两位数', mixed: '两位×三位', three: '三位数', review: '错题重练' };
+  const SETTINGS_KEY = 'kousuan.settings.v2';
+  const MODEL_URL = 'model/vosk-model-small-cn-0.22.tar.gz';
 
-  // ---------- 设置（本机记忆） ----------
-  let settings = { mode: 'typing', level: 'two', count: 10 };
+  // ---------- 设置 ----------
+  const defaults = { mode: 'typing', level: 'two', count: 10 };
+  let settings = { ...defaults };
   try {
     const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
-    if (saved && typeof saved === 'object') settings = { ...settings, ...saved };
-  } catch (_) { /* 忽略损坏的存档 */ }
+    if (saved && typeof saved === 'object') settings = { ...defaults, ...saved };
+  } catch (_) { /* 存档损坏就用默认值 */ }
   let mode = settings.mode === 'voice' ? 'voice' : 'typing';
   let level = ['two', 'mixed', 'three'].includes(settings.level) ? settings.level : 'two';
-  let targetCount = [0, 10, 20, 30].includes(settings.count) ? settings.count : 10;
+  let count = [0, 10, 20, 30].includes(settings.count) ? settings.count : 10;
 
   function saveSettings() {
     try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ mode, level, count: targetCount }));
-    } catch (_) { /* 存储不可用时静默跳过 */ }
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ mode, level, count }));
+    } catch (_) { /* 隐私模式下存不了，忽略 */ }
   }
 
   // ---------- 练习状态 ----------
-  let questionCount = 0;
-  let answeredCount = 0;
-  let correctCount = 0;
-  let streak = 0;
-  let bestStreak = 0;
-  let currentAnswer = 0;
-  let currentHtml = '';
-  let currentText = '';
-  let locked = false;
-  let awaitingNext = false;
+  let total = 0;
+  let index = 0;
+  let answered = 0;
+  let answer = 0;
+  let questionText = '';
+  let correct = 0;
+  let wrong = [];
+  let locked = true;
   let seen = new Set();
-  let wrongList = [];
-  let durations = [];
-  let sessionStart = 0;
-  let questionStart = 0;
-  let timerId = null;
-  let pausedTotal = 0;
-  let pauseStart = 0;
-  let reviewMode = false;
-  let reviewQueue = [];
-  let wakeLock = null;
+  let startedAt = 0;
+  let questionAt = 0;
+  let pausedMs = 0;
+  let pauseAt = 0;
+  let ticker = 0;
+  let advancing = 0;
 
-  // ---------- 语音识别 ----------
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const recognitionAvailable = typeof SpeechRecognition === 'function';
-  let recognition = null;
+  // ---------- 语音（本地 Vosk） ----------
+  const voiceSupported = typeof window.Vosk !== 'undefined' && Boolean(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) && Boolean(window.AudioContext || window.webkitAudioContext);
+  let model = null;
+  let modelLoading = null;
+  let recognizer = null;
+  let micStream = null;
+  let audioCtx = null;
+  let drain = null;
+  let processor = null;
   let listening = false;
-  let wantListening = false;
-  let silenceCount = 0;
+  let wantListen = false;
+  let partialSeen = '';
+  let silenceCounter = 0;
+  let finishTimer = 0;
+  let lastSpoken = 0;
+  let retries = 0;
 
-  if (recognitionAvailable) {
-    recognition = new SpeechRecognition();
-    recognition.lang = 'zh-CN';
-    recognition.interimResults = true;
-    recognition.continuous = false;
-    recognition.maxAlternatives = 1;
-    recognition.onstart = () => {
-      listening = true;
-      startFailures = 0;
-      updateVoiceButton();
-    };
-    recognition.onresult = onSpeechResult;
-    recognition.onerror = onSpeechError;
-    recognition.onend = onSpeechEnd;
-  }
-  let startFailures = 0;
-
-  function onSpeechResult(event) {
-    const last = event.results[event.results.length - 1];
-    const text = last[0].transcript.trim();
-    if (!last.isFinal) {
-      heardEl.textContent = text ? `听到：${text}…` : '';
-      return;
-    }
-    heardEl.textContent = text ? `听到：${text}` : '';
-    const value = parseSpokenNumber(text);
-    if (value === null) {
-      noteSilence('没听清数字，请再说一次。');
-      return; // onend 会自动继续聆听
-    }
-    silenceCount = 0;
-    answerInput.value = String(value);
-    checkAnswer(value);
-    stopListening(); // 判定后立即停止收音
+  // ---------- 视图 ----------
+  function showView(name) {
+    setupEl.hidden = name !== 'setup';
+    practiceEl.hidden = name !== 'practice';
+    resultsEl.hidden = name !== 'results';
+    dock.hidden = false;
+    startBtn.hidden = name !== 'setup';
+    againBtn.hidden = name !== 'results';
+    backBtn.hidden = name !== 'results';
+    dockTyping.hidden = true;
+    micBtn.hidden = true;
+    window.scrollTo({ top: 0 });
   }
 
-  function onSpeechError(event) {
-    if (event.error === 'aborted') return;
-    if (event.error === 'no-speech') {
-      noteSilence('没听清，请再说一次。');
-      return; // onend 会自动继续聆听
-    }
-    wantListening = false;
-    const messages = {
-      'not-allowed': '麦克风权限被拒绝，请在浏览器设置中允许使用麦克风。',
-      'service-not-allowed': '当前环境不允许使用语音识别。',
-      'audio-capture': '没有检测到麦克风，请检查设备。',
-      network: '语音识别需要联网，请检查网络后重试。',
-    };
-    setFeedback(messages[event.error] || '语音识别暂不可用，请点按按钮重试，或改用打字作答。', 'bad');
+  function showTypingDock() {
+    dockTyping.hidden = false;
+    micBtn.hidden = true;
+    switchTypingBtn.hidden = true;
+    submitBtn.disabled = locked;
+    answerInput.disabled = locked;
+    if (!locked) answerInput.focus({ preventScroll: true });
   }
 
-  function noteSilence(message) {
-    silenceCount += 1;
-    if (silenceCount >= 3) {
-      wantListening = false;
-      setFeedback('多次没听到答案，已暂停聆听。点按钮可以继续。', 'bad');
-      return;
-    }
-    setFeedback(message, 'bad');
+  function showMicDock() {
+    dockTyping.hidden = true;
+    micBtn.hidden = false;
+    switchTypingBtn.hidden = false;
+    micBtn.disabled = locked || !model;
+    if (!model) micLabel.textContent = '正在准备语音…';
+    else if (!listening && !locked) micLabel.textContent = '点一下开始说话';
+    micBtn.classList.toggle('is-listening', listening);
   }
 
-  function onSpeechEnd() {
-    listening = false;
-    updateVoiceButton();
-    if (wantListening && mode === 'voice' && !locked && !practiceEl.hidden) {
-      window.setTimeout(() => {
-        if (wantListening && mode === 'voice' && !locked && !practiceEl.hidden) startListening();
-      }, 250);
-    }
+  function setFeedback(text, kind = '') {
+    feedbackEl.textContent = text;
+    feedbackEl.className = `feedback ${kind}`.trim();
   }
 
-  function startListening() {
-    if (!recognitionAvailable || listening || locked || practiceEl.hidden) return;
-    if (startFailures >= 5) {
-      wantListening = false;
-      setFeedback('语音识别多次启动失败，请点按按钮重试，或改用打字作答。', 'bad');
-      return;
-    }
-    try {
-      recognition.start();
-      listening = true;
-      updateVoiceButton();
-    } catch (_) {
-      // 上一轮识别可能还没完全结束，稍后重试
-      listening = false;
-      startFailures += 1;
-      window.setTimeout(() => {
-        if (wantListening && !listening && !locked && !practiceEl.hidden) startListening();
-      }, 300);
-    }
-  }
-
-  function stopListening() {
-    wantListening = false;
-    if (recognitionAvailable && listening) {
-      try { recognition.stop(); } catch (_) { /* 可能已停止 */ }
-    }
-    listening = false;
-    updateVoiceButton();
-  }
-
-  function updateVoiceButton() {
-    voiceButton.classList.toggle('listening', listening);
-    if (!recognitionAvailable) {
-      voiceLabel.textContent = '当前浏览器不支持语音识别';
-      voiceButton.disabled = true;
-      return;
-    }
-    voiceButton.disabled = locked;
-    if (locked) {
-      voiceLabel.textContent = '本题已作答';
-    } else {
-      voiceLabel.textContent = listening ? '正在聆听，点按可暂停' : '点按开始聆听';
-    }
-  }
-
-  // ---------- 设置界面 ----------
-  function bindChoice(selector, apply) {
-    $$(selector).forEach((button) => {
-      button.addEventListener('click', () => {
-        apply(button.dataset);
-        syncChoiceUI();
+  // ---------- 设置交互 ----------
+  function bindGroup(selector, apply) {
+    document.querySelectorAll(selector).forEach((btn) => {
+      btn.addEventListener('click', () => {
+        apply(btn.dataset);
+        syncSetup();
         saveSettings();
         updateVoiceNote();
       });
     });
   }
 
-  bindChoice('.mode-card', (d) => { mode = d.mode; });
-  bindChoice('.difficulty-card', (d) => { level = d.level; });
-  bindChoice('.quantity-option', (d) => { targetCount = Number(d.count); });
-
-  function syncChoiceUI() {
-    $$('.mode-card').forEach((b) => {
-      const selected = b.dataset.mode === mode;
-      b.classList.toggle('selected', selected);
-      b.setAttribute('aria-pressed', String(selected));
+  function syncSetup() {
+    document.querySelectorAll('.mode-card').forEach((b) => {
+      const on = b.dataset.mode === mode;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-pressed', String(on));
     });
-    $$('.difficulty-card').forEach((b) => {
-      const selected = b.dataset.level === level;
-      b.classList.toggle('selected', selected);
-      b.setAttribute('aria-pressed', String(selected));
+    document.querySelectorAll('.list-row').forEach((b) => {
+      const on = b.dataset.level === level;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-checked', String(on));
     });
-    $$('.quantity-option').forEach((b) => {
-      const selected = Number(b.dataset.count) === targetCount;
-      b.classList.toggle('selected', selected);
-      b.setAttribute('aria-pressed', String(selected));
+    document.querySelectorAll('.segment').forEach((b) => {
+      const on = Number(b.dataset.count) === count;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-checked', String(on));
     });
   }
 
@@ -229,465 +157,578 @@
       return;
     }
     voiceNote.hidden = false;
-    voiceNote.textContent = recognitionAvailable
-      ? '语音作答：开始后会自动聆听，直接说出答案即可。需要允许麦克风权限。'
-      : '当前浏览器不支持语音识别。请使用 Chrome 浏览器打开，并允许麦克风权限（需要 HTTPS 或 localhost）。也可以先用打字作答。';
+    voiceNote.textContent = voiceSupported
+      ? '语音在本机离线识别，不联网、不上传。首次使用需下载约 42MB 模型。'
+      : '这个浏览器不支持本地语音识别，请改用打字作答，或换 Chrome / Safari 打开。';
   }
 
-  // ---------- 视图切换 ----------
-  function showView(view) {
-    setupEl.hidden = view !== 'setup';
-    practiceEl.hidden = view !== 'practice';
-    resultsEl.hidden = view !== 'results';
-    const target = view === 'setup' ? $('#setup-title') : view === 'practice' ? $('#practice-title') : $('#results-title');
-    if (target) target.focus({ preventScroll: true });
-    window.scrollTo({ top: 0 });
-  }
+  bindGroup('.mode-card', (d) => { mode = d.mode; });
+  bindGroup('.list-row', (d) => { level = d.level; });
+  bindGroup('.segment', (d) => { count = Number(d.count); });
 
-  function updateModeUI() {
-    const voiceUsable = mode === 'voice' && recognitionAvailable;
-    // 语音模式但浏览器不支持时，直接露出输入框，少一步折腾
-    answerForm.hidden = mode !== 'typing' && recognitionAvailable;
-    voiceArea.hidden = mode !== 'voice';
-    voiceButton.hidden = !voiceUsable;
-    $('#voice-hint').hidden = !voiceUsable;
-    $('#voice-fallback').hidden = !voiceUsable;
-    nextButton.hidden = !awaitingNext;
-    updateVoiceButton();
-  }
-
-  // ---------- 练习流程 ----------
-  function startSession(options = {}) {
-    reviewMode = Boolean(options.review);
-    reviewQueue = reviewMode ? wrongList.slice() : [];
-    wrongList = [];
-    questionCount = 0;
-    answeredCount = 0;
-    correctCount = 0;
-    streak = 0;
-    bestStreak = 0;
-    durations = [];
-    seen = new Set();
-    locked = false;
-    awaitingNext = false;
-    sessionStart = Date.now();
-    pausedTotal = 0;
-    pauseStart = 0;
-    showView('practice');
-    updateModeUI();
-    startTimer();
-    requestWakeLock();
-    nextQuestion();
-  }
-
-  function nextQuestion() {
-    if (practiceEl.hidden) return;
-    if (reviewMode) {
-      if (reviewQueue.length === 0) { finishSession(); return; }
-    } else if (targetCount > 0 && questionCount >= targetCount) {
-      finishSession();
-      return;
-    }
-    locked = false;
-    awaitingNext = false;
-    nextButton.hidden = true;
-    resumeTimer();
-    questionCount += 1;
-
-    let q;
-    if (reviewMode) {
-      const item = reviewQueue.shift();
-      q = { html: item.html, text: item.text, answer: item.answer };
-    } else {
-      q = makeQuestion();
-    }
-    currentAnswer = q.answer;
-    currentHtml = q.html;
-    currentText = q.text;
-    questionEl.innerHTML = q.html;
-
-    const total = reviewMode ? questionCount + reviewQueue.length : targetCount;
-    progressLabel.textContent = total > 0 ? `第 ${questionCount} / ${total} 题` : `第 ${questionCount} 题`;
-    progressFill.style.width = total > 0 ? `${Math.round(((questionCount - 1) / total) * 100)}%` : '0%';
-
-    answerInput.value = '';
-    voiceButton.disabled = false;
-    $('#skip-button').hidden = false;
-    heardEl.textContent = '';
-    questionStart = Date.now();
-    updateModeUI();
-
-    if (mode === 'typing') {
-      setFeedback('输入答案后按确认。');
-      answerInput.focus({ preventScroll: true });
-    } else if (recognitionAvailable) {
-      setFeedback('请说出答案。');
-      wantListening = true;
-      silenceCount = 0;
-      startListening();
-    } else {
-      setFeedback('这个浏览器不支持语音识别，直接输入答案就行。', 'bad');
-      answerInput.focus({ preventScroll: true });
-    }
-  }
-
-  function checkAnswer(value) {
-    if (locked || practiceEl.hidden) return;
-    locked = true;
-    updateVoiceButton();
-    durations.push((Date.now() - questionStart) / 1000);
-    answeredCount += 1;
-    if (value === currentAnswer) {
-      correctCount += 1;
-      streak += 1;
-      bestStreak = Math.max(bestStreak, streak);
-      setFeedback(streak >= 2 ? `答对了，连续答对 ${streak} 题！` : '答对了。', 'good');
-      pauseTimer();
-      vibrate(10);
-      window.setTimeout(() => { if (!practiceEl.hidden) nextQuestion(); }, 800);
-    } else {
-      streak = 0;
-      wrongList.push({ html: currentHtml, text: currentText, answer: currentAnswer, yours: value });
-      setFeedback(`不对，正确答案是 ${currentAnswer}。`, 'bad');
-      vibrate(60);
-      enterAwaitingNext();
-    }
-  }
-
-  function skipQuestion() {
-    if (locked || practiceEl.hidden) return;
-    locked = true;
-    updateVoiceButton();
-    durations.push((Date.now() - questionStart) / 1000);
-    answeredCount += 1;
-    streak = 0;
-    wrongList.push({ html: currentHtml, text: currentText, answer: currentAnswer, yours: '跳过' });
-    setFeedback(`已跳过，正确答案是 ${currentAnswer}。`, 'bad');
-    enterAwaitingNext();
-  }
-
-  function enterAwaitingNext() {
-    awaitingNext = true;
-    pauseTimer();
-    stopListening();
-    voiceButton.disabled = true;
-    nextButton.hidden = false;
-    $('#skip-button').hidden = true;
-    if (!answerForm.hidden) {
-      // 键盘保持打开，再按一次回车即可进入下一题
-      answerInput.focus({ preventScroll: true });
-    } else {
-      nextButton.focus({ preventScroll: true });
-    }
-  }
-
-  function finishSession() {
-    stopListening();
-    stopTimer();
-    releaseWakeLock();
-    if (answeredCount === 0) {
-      showView('setup');
-      return;
-    }
-    const accuracy = Math.round((correctCount / answeredCount) * 100);
-    const totalSeconds = Math.max(1, elapsedSeconds());
-    const avg = durations.length ? durations.reduce((sum, d) => sum + d, 0) / durations.length : 0;
-
-    $('#result-correct').textContent = String(correctCount);
-    $('#result-total').textContent = String(answeredCount);
-    $('#result-accuracy').textContent = `${accuracy}%`;
-    $('#result-time').textContent = formatTime(totalSeconds);
-    $('#result-avg').textContent = avg ? `${avg.toFixed(1)} 秒` : '—';
-    $('#result-streak').textContent = String(bestStreak);
-    $('#result-message').textContent =
-      accuracy === 100 ? '全部答对，状态很好。' :
-      accuracy >= 80 ? '表现不错，继续保持。' :
-      '多练几组，速度和准确率都会上去。';
-
-    // 历史最佳：按难度分别记录，至少答 5 题才计入
-    let bestAll = {};
-    try { bestAll = JSON.parse(localStorage.getItem(BEST_KEY) || '{}') || {}; } catch (_) { /* 忽略 */ }
-    const key = reviewMode ? 'review' : level;
-    const prev = bestAll[key];
-    let isRecord = false;
-    if (answeredCount >= 5) {
-      if (!prev || accuracy > prev.accuracy || (accuracy === prev.accuracy && avg > 0 && avg < prev.avg)) {
-        isRecord = Boolean(prev);
-        bestAll[key] = { accuracy, avg: Math.round(avg * 10) / 10 };
-        try { localStorage.setItem(BEST_KEY, JSON.stringify(bestAll)); } catch (_) { /* 忽略 */ }
-      }
-    }
-    const best = bestAll[key] || null;
-    const bestLine = $('#best-line');
-    if (best) {
-      bestLine.hidden = false;
-      bestLine.textContent = `${BEST_LABELS[key]}最佳：正确率 ${best.accuracy}% · 平均 ${best.avg} 秒/题${isRecord ? ' · 刷新纪录' : ''}`;
-    } else if (answeredCount >= 5) {
-      bestLine.hidden = false;
-      bestLine.textContent = isRecord ? '刷新本难度纪录。' : '本次已记为最佳成绩。';
-    } else {
-      bestLine.hidden = true;
-    }
-
-    // 错题列表
-    const wrongSection = $('#wrong-section');
-    const wrongListEl = $('#wrong-list');
-    wrongListEl.innerHTML = '';
-    if (wrongList.length) {
-      wrongSection.hidden = false;
-      $('#wrong-title').textContent = `答错的题（${wrongList.length}）`;
-      wrongList.forEach((item) => {
-        const li = document.createElement('li');
-        const q = document.createElement('span');
-        q.className = 'wrong-q';
-        q.textContent = item.text;
-        const a = document.createElement('span');
-        a.className = 'wrong-a';
-        a.textContent = `你答 ${item.yours} · 正确答案 ${item.answer}`;
-        li.append(q, a);
-        wrongListEl.appendChild(li);
-      });
-    } else {
-      wrongSection.hidden = true;
-    }
-    $('#review-button').hidden = wrongList.length === 0;
-    showView('results');
-  }
-
-  // ---------- 题目生成 ----------
-  function makeQuestion() {
-    for (let i = 0; i < 25; i += 1) {
-      const q = genQuestion();
-      if (!seen.has(q.text)) {
-        seen.add(q.text);
-        return q;
-      }
-    }
-    return genQuestion();
-  }
-
-  function genQuestion() {
-    for (;;) {
-      let a;
-      let b;
-      if (level === 'two') {
-        a = randInt(10, 99);
-        b = randInt(10, 99);
-      } else if (level === 'mixed') {
-        a = randInt(100, 999);
-        b = randInt(10, 99);
-        if (Math.random() < 0.5) [a, b] = [b, a];
-      } else {
-        a = randInt(100, 999);
-        b = randInt(100, 999);
-      }
-      const subtract = Math.random() < 0.5;
-      if (subtract) {
-        if (b > a) [a, b] = [b, a];
-        if (a === b) continue;
-        const answer = a - b;
-        const text = `${a} − ${b}`;
-        return { answer, text, html: `${a} <span>−</span> ${b} <span>=</span> ?` };
-      }
-      const answer = a + b;
-      const text = `${a} + ${b}`;
-      return { answer, text, html: `${a} <span>+</span> ${b} <span>=</span> ?` };
-    }
-  }
-
+  // ---------- 题目 ----------
   function randInt(min, max) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
 
-  // ---------- 计时 ----------
-  function startTimer() {
-    stopTimer();
-    updateTimer();
-    timerId = window.setInterval(updateTimer, 500);
-  }
-
-  function stopTimer() {
-    if (timerId !== null) {
-      window.clearInterval(timerId);
-      timerId = null;
+  function makeQuestion() {
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      let a;
+      let b;
+      if (level === 'two') {
+        a = randInt(11, 99);
+        b = randInt(11, 99);
+      } else if (level === 'mixed') {
+        a = randInt(101, 999);
+        b = randInt(11, 99);
+        if (Math.random() < 0.5) [a, b] = [b, a];
+      } else {
+        a = randInt(101, 999);
+        b = randInt(101, 999);
+      }
+      const minus = Math.random() < 0.5;
+      if (minus) {
+        if (a === b) continue;
+        if (b > a) [a, b] = [b, a];
+      } else if (a + b > 1998) {
+        continue;
+      }
+      const text = `${a} ${minus ? '−' : '+'} ${b}`;
+      if (seen.has(text)) continue;
+      seen.add(text);
+      return { text, value: minus ? a - b : a + b };
     }
+    // 极端情况（题池被用尽）退回一对不重复的组合
+    const a = randInt(101, 999);
+    const b = randInt(101, 998);
+    const big = Math.max(a, b + 1);
+    const small = Math.min(a, b + 1);
+    return { text: `${big} − ${small}`, value: big - small };
   }
 
-  function elapsedSeconds() {
-    const paused = pausedTotal + (pauseStart ? Date.now() - pauseStart : 0);
-    return Math.max(0, Math.floor((Date.now() - sessionStart - paused) / 1000));
+  // ---------- 计时 ----------
+  function elapsed() {
+    const paused = pausedMs + (pauseAt ? Date.now() - pauseAt : 0);
+    return Math.max(0, Math.floor((Date.now() - startedAt - paused) / 1000));
   }
 
-  function updateTimer() {
-    timerEl.textContent = formatTime(elapsedSeconds());
+  function fmt(seconds) {
+    return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+  }
+
+  function paintTimer() {
+    timerLabel.textContent = fmt(elapsed());
   }
 
   function pauseTimer() {
-    if (!pauseStart) pauseStart = Date.now();
-    updateTimer();
+    if (!pauseAt) pauseAt = Date.now();
+    paintTimer();
   }
 
   function resumeTimer() {
-    if (pauseStart) {
-      pausedTotal += Date.now() - pauseStart;
-      pauseStart = 0;
+    if (mode === 'voice' && !voiceLoading.hidden) { paintTimer(); return; }
+    if (pauseAt) {
+      pausedMs += Date.now() - pauseAt;
+      pauseAt = 0;
     }
-    updateTimer();
+    paintTimer();
   }
 
-  function formatTime(seconds) {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  // ---------- 开始一组 ----------
+  function startSession() {
+    total = count > 0 ? count : 0;
+    index = 0;
+    answered = 0;
+    correct = 0;
+    wrong = [];
+    seen = new Set();
+    locked = true;
+    startedAt = Date.now();
+    pausedMs = 0;
+    pauseAt = 0;
+    window.clearInterval(ticker);
+    ticker = window.setInterval(paintTimer, 500);
+    paintTimer();
+    showView('practice');
+    nextQuestion();
+    if (mode === 'voice') {
+      if (!voiceSupported) {
+        mode = 'typing';
+        syncSetup();
+        saveSettings();
+      } else {
+        prepareVoice();
+      }
+    }
   }
 
-  // ---------- 屏幕常亮 / 震动 ----------
-  async function requestWakeLock() {
+  function nextQuestion() {
+    window.clearTimeout(advancing);
+    stopListening();
+    if (mode === 'voice') freshRecognizer();
+    if (total > 0 && answered >= total) {
+      finish();
+      return;
+    }
+    index += 1;
+    const q = makeQuestion();
+    answer = q.value;
+    questionText = q.text;
+    questionEl.textContent = `${q.text} = ?`;
+    setFeedback('');
+    heardEl.textContent = '';
+    progressLabel.textContent = total > 0 ? `第 ${index} / ${total} 题` : `第 ${index} 题`;
+    progressBar.style.width = total > 0 ? `${Math.round(((index - 1) / total) * 100)}%` : '0%';
+    answerInput.value = '';
+    locked = false;
+    retries = 0;
+    resumeTimer();
+    questionAt = Date.now();
+    if (mode === 'typing') {
+      showTypingDock();
+    } else {
+      showMicDock();
+      voiceReady().then(() => {
+        if (!locked && mode === 'voice') startListening();
+      });
+    }
+  }
+
+  function grade(value) {
+    if (locked) return;
+    locked = true;
+    answered += 1;
+    const spent = Math.max(0.2, (Date.now() - questionAt) / 1000);
+    if (value === answer) {
+      correct += 1;
+      setFeedback(`答对了 · ${spent.toFixed(1)} 秒`, 'good');
+      pauseTimer();
+      if (mode === 'typing') {
+        submitBtn.disabled = true;
+        answerInput.disabled = true;
+      }
+      advancing = window.setTimeout(nextQuestion, 700);
+    } else {
+      wrong.push({ text: questionText, answer, given: value });
+      setFeedback(`答案是 ${answer}，下一题继续`, 'bad');
+      pauseTimer();
+      if (mode === 'typing') {
+        submitBtn.disabled = true;
+        answerInput.disabled = true;
+      } else {
+        stopListening();
+        micBtn.disabled = true;
+      }
+      advancing = window.setTimeout(nextQuestion, 1600);
+    }
+  }
+
+  function finish() {
+    window.clearInterval(ticker);
+    releaseMic();
+    const seconds = Math.max(1, elapsed());
+    const accuracy = Math.round((correct / Math.max(1, answered)) * 100);
+    $('#stat-accuracy').textContent = `${accuracy}%`;
+    $('#stat-time').textContent = fmt(seconds);
+    const done = Math.max(1, answered);
+    const parts = [`答对 ${correct} / ${done} 题`];
+    parts.push(`平均 ${(seconds / done).toFixed(1)} 秒/题`);
+    if (wrong.length) parts.push(`错题：${wrong.slice(0, 3).map((w) => `${w.text} = ${w.answer}`).join('，')}${wrong.length > 3 ? ' 等' : ''}`);
+    $('#result-sub').textContent = parts.join(' · ');
+    locked = true;
+    showView('results');
+  }
+
+  // ---------- 语音：加载模型 ----------
+  function setLoadingVisible(visible) {
+    voiceLoading.hidden = !visible;
+    practiceEl.classList.toggle('is-loading', visible);
+  }
+
+  function setLoading(percent, text) {
+    setLoadingVisible(true);
+    voiceLoadingText.textContent = text;
+    voiceLoadingBar.style.width = `${percent}%`;
+  }
+
+  const MODEL_CACHE = 'kousuan-voice-v1';
+
+  function cachedModel() {
+    if (!window.caches) return Promise.resolve(null);
+    return caches.open(MODEL_CACHE)
+      .then((cache) => cache.match(MODEL_URL))
+      .then((hit) => (hit ? hit.arrayBuffer() : null))
+      .catch(() => null);
+  }
+
+  function storeModel(buffer) {
+    if (!window.caches) return;
+    caches.open(MODEL_CACHE)
+      .then((cache) => cache.put(MODEL_URL, new Response(buffer, {
+        headers: { 'content-type': 'application/gzip', 'content-length': String(buffer.byteLength) },
+      })))
+      .catch(() => { /* 空间不足就下次再下 */ });
+  }
+
+  function fetchModel(url, onProgress) {
+    return fetch(url).then((res) => {
+      if (!res.ok) throw new Error(`模型下载失败（${res.status}）`);
+      const length = Number(res.headers.get('content-length')) || 43899961;
+      if (!res.body || !res.body.getReader) return res.arrayBuffer();
+      const reader = res.body.getReader();
+      const chunks = [];
+      let received = 0;
+      const pump = () => reader.read().then(({ done, value }) => {
+        if (done) {
+          const out = new Uint8Array(received);
+          let offset = 0;
+          chunks.forEach((c) => { out.set(c, offset); offset += c.length; });
+          return out.buffer;
+        }
+        chunks.push(value);
+        received += value.length;
+        onProgress(Math.min(0.99, received / length));
+        return pump();
+      });
+      return pump();
+    });
+  }
+
+  function voiceReady() {
+    if (model) return Promise.resolve(model);
+    if (modelLoading) return modelLoading;
+    modelLoading = cachedModel()
+      .then((cached) => {
+        if (cached) {
+          setLoading(100, '正在载入模型…');
+          return cached;
+        }
+        return fetchModel(MODEL_URL, (ratio) => {
+          setLoading(Math.round(ratio * 100), `正在下载语音模型 ${Math.round(ratio * 100)}%`);
+        }).then((buffer) => {
+          storeModel(buffer.slice(0));
+          return buffer;
+        });
+      })
+      .then((buffer) => {
+        const blobUrl = URL.createObjectURL(new Blob([buffer], { type: 'application/gzip' }));
+        setLoading(100, '正在载入模型…');
+        return window.Vosk.createModel(blobUrl);
+      })
+      .then((loaded) => {
+        model = loaded;
+        setLoading(100, '语音已就绪');
+        setLoadingVisible(false);
+        if (pauseAt && answered === 0) resumeTimer();
+        if (!locked && mode === 'voice') {
+          micBtn.disabled = false;
+          micLabel.textContent = '点一下开始说话';
+        }
+        return model;
+      })
+      .catch((err) => {
+        modelLoading = null;
+        setLoadingVisible(false);
+        micBtn.classList.add('is-error');
+        micLabel.textContent = '语音初始化失败，可改用打字';
+        setFeedback(err && err.message ? err.message : '语音初始化失败', 'bad');
+        throw err;
+      });
+    return modelLoading;
+  }
+
+  function prepareVoice() {
+    if (!voiceSupported) return;
+    setLoading(1, '正在准备语音…');
+    if (answered === 0) pauseTimer();
+    micBtn.disabled = true;
+    micLabel.textContent = '正在准备语音…';
+    voiceReady().catch(() => {
+      micBtn.disabled = false;
+      if (mode === 'voice') micLabel.textContent = '语音没能启动，可改用打字';
+    });
+  }
+
+  // ---------- 语音：录音与识别 ----------
+  function freshRecognizer() {
+    if (!model) return null;
+    if (recognizer) {
+      try { recognizer.remove(); } catch (_) { /* 已释放 */ }
+      recognizer = null;
+    }
     try {
-      wakeLock = await navigator.wakeLock.request('screen');
+      recognizer = new model.KaldiRecognizer(16000);
+      recognizer.on('result', onSpeechResult);
+      recognizer.on('partialresult', onSpeechPartial);
+      return recognizer;
     } catch (_) {
-      wakeLock = null;
+      recognizer = null;
+      return null;
     }
   }
 
-  function releaseWakeLock() {
-    try { if (wakeLock) wakeLock.release(); } catch (_) { /* 忽略 */ }
-    wakeLock = null;
+  // 整组练习只申请一次麦克风，换题只重建识别器，不用反复授权、也更快
+  function ensureMic() {
+    if (micStream && audioCtx && audioCtx.state !== 'closed') return Promise.resolve();
+    if (!audioCtx) unlockAudio();
+    if (!audioCtx) return Promise.reject(new Error('no audio context'));
+    return navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    }).then((stream) => {
+      micStream = stream;
+      const source = audioCtx.createMediaStreamSource(stream);
+      processor = audioCtx.createScriptProcessor(2048, 1, 1);
+      processor.onaudioprocess = (event) => {
+        if (!listening || locked || !recognizer) return;
+        try {
+          recognizer.acceptWaveformFloat(event.inputBuffer.getChannelData(0), audioCtx.sampleRate);
+        } catch (_) { /* 单帧失败不影响后续 */ }
+      };
+      source.connect(processor);
+      // 接到 0 增益节点：只驱动音频时钟，不把麦克风回放成喇叭声
+      drain = audioCtx.createGain();
+      drain.gain.value = 0;
+      processor.connect(drain);
+      drain.connect(audioCtx.destination);
+      return audioCtx.state === 'suspended' ? audioCtx.resume() : undefined;
+    });
   }
+
+  function startListening() {
+    if (!model || locked || listening) return;
+    wantListen = true;
+    if (!freshRecognizer()) return;
+    partialSeen = '';
+    silenceCounter = 0;
+    retries = 0;
+    lastSpoken = 0;
+    micBtn.disabled = locked;
+    ensureMic().then(() => {
+      if (!wantListen || locked) return;
+      listening = true;
+      micBtn.classList.add('is-listening');
+      micBtn.classList.remove('is-error');
+      micLabel.textContent = '正在聆听，请说答案';
+      window.clearInterval(finishTimer);
+      finishTimer = window.setInterval(checkQuiet, 350);
+    }).catch((err) => {
+      wantListen = false;
+      micBtn.classList.add('is-error');
+      micLabel.textContent = err && err.name === 'NotAllowedError' ? '麦克风权限被拒绝' : '打不开麦克风，可改用打字';
+      setFeedback(err && err.name === 'NotAllowedError' ? '请允许使用麦克风后再试' : '打不开麦克风', 'bad');
+    });
+  }
+
+  function checkQuiet() {
+    if (!listening || locked) return;
+    // 说话停下来后主动收尾，让识别尽快出结果
+    if (lastSpoken && Date.now() - lastSpoken > 900) {
+      lastSpoken = 0;
+      try { recognizer.retrieveFinalResult(); } catch (_) { /* 忽略 */ }
+    }
+  }
+
+  function onSpeechPartial(message) {
+    if (locked) return;
+    const text = (message && message.result && message.result.partial) || '';
+    if (!text) return;
+    partialSeen = text;
+    lastSpoken = Date.now();
+    heardEl.textContent = `听到：${text}`;
+  }
+
+  function onSpeechResult(message) {
+    if (locked) return;
+    const text = (message && message.result && message.result.text) || '';
+    if (!text) {
+      silenceCounter += 1;
+      if (silenceCounter >= 3) {
+        micLabel.textContent = '没听到声音，点一下继续说';
+        stopListening();
+      }
+      return;
+    }
+    silenceCounter = 0;
+    const value = parseSpokenNumber(text);
+    heardEl.textContent = `听到：${text}`;
+    if (value === null || value > 1998) {
+      setFeedback('没听清数字，再说一次', 'bad');
+      return;
+    }
+    if (value === answer) {
+      grade(value);
+      return;
+    }
+    // 可能是没听准，给两次重说的机会，避免把听错算成答错
+    retries += 1;
+    if (retries < 3) {
+      setFeedback(`听到 ${value}，如果不是这个数就再说一次`, 'bad');
+      return;
+    }
+    grade(value);
+  }
+
+  function stopListening() {
+    wantListen = false;
+    window.clearInterval(finishTimer);
+    finishTimer = 0;
+    listening = false;
+    micBtn.classList.remove('is-listening');
+    if (!locked && mode === 'voice') micLabel.textContent = '点一下继续说';
+  }
+
+  function releaseMic() {
+    stopListening();
+    if (processor) {
+      processor.onaudioprocess = null;
+      try { processor.disconnect(); } catch (_) { /* 已断开 */ }
+      processor = null;
+    }
+    if (micStream) {
+      micStream.getTracks().forEach((t) => t.stop());
+      micStream = null;
+    }
+    if (recognizer) {
+      try { recognizer.remove(); } catch (_) { /* 已释放 */ }
+      recognizer = null;
+    }
+  }
+
+  // ---------- 中文数字解析 ----------
+  const DIGITS = { 零: 0, 〇: 0, 一: 1, 幺: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
+  const UNITS = { 十: 10, 百: 100, 千: 1000 };
+
+  function parseSpokenNumber(raw) {
+    if (!raw) return null;
+    let text = String(raw)
+      .replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+      .replace(/[\s，。、；：？！,.]/g, '');
+    if (!text) return null;
+    // 口算答案不超过四位数，出现「万/亿」几乎都是误识别，直接作废
+    if (text.includes('万') || text.includes('亿')) return null;
+    if (/^\d+$/.test(text)) return Number(text);
+
+    let section = 0;
+    let run = null;
+    let found = false;
+    let total = 0;
+    for (const ch of text) {
+      if (Object.prototype.hasOwnProperty.call(DIGITS, ch)) {
+        run = run === null ? DIGITS[ch] : run * 10 + DIGITS[ch];
+        found = true;
+      } else if (Object.prototype.hasOwnProperty.call(UNITS, ch)) {
+        section += (run === null ? 1 : run) * UNITS[ch];
+        run = null;
+        found = true;
+      }
+    }
+    if (!found) return null;
+    // 「一百亿」这类误识别会算出天文数字，超出答案范围一律作废
+    return total + section + (run === null ? 0 : run);
+  }
+
+  // ---------- 事件 ----------
+  // 安卓 Chrome 只允许在用户手势里启动音频；这里同步解锁，后面接麦克风才不会挂起
+  const MIC_RATE = 16000;
+
+  function unlockAudio() {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    if (!audioCtx) {
+      // 安卓 Chrome 默认 48kHz，而离线模型只认 16kHz，必须在这里指定，否则识别全是乱码
+      try { audioCtx = new Ctx({ sampleRate: MIC_RATE }); } catch (_) {
+        try { audioCtx = new Ctx(); } catch (_) { audioCtx = null; }
+      }
+    }
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  }
+
+  startBtn.addEventListener('click', () => {
+    unlockAudio();
+    startSession();
+  });
+
+  againBtn.addEventListener('click', () => {
+    unlockAudio();
+    startSession();
+  });
+
+  backBtn.addEventListener('click', () => {
+    releaseMic();
+    showView('setup');
+  });
+
+  dockTyping.addEventListener('submit', (event) => {
+    event.preventDefault();
+    if (locked) return;
+    const raw = answerInput.value.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/[\s,，]/g, '');
+    if (!/^\d+$/.test(raw)) {
+      setFeedback('输入数字再确认', 'bad');
+      return;
+    }
+    grade(Number(raw));
+  });
+
+  micBtn.addEventListener('click', () => {
+    unlockAudio();
+    if (locked) return;
+    if (listening) {
+      stopListening();
+    } else {
+      voiceReady().then(() => { if (!locked) startListening(); }).catch(() => {});
+    }
+  });
+
+  switchTypingBtn.addEventListener('click', () => {
+    releaseMic();
+    mode = 'typing';
+    syncSetup();
+    saveSettings();
+    if (!locked) showTypingDock();
+  });
+
+  skipBtn.addEventListener('click', () => {
+    if (locked) return;
+    answered += 1;
+    wrong.push({ text: questionText, answer, given: '跳过' });
+    setFeedback(`答案是 ${answer}`, 'bad');
+    locked = true;
+    pauseTimer();
+    nextQuestion();
+  });
+
+  quitBtn.addEventListener('click', () => {
+    if (locked && !listening) {
+      finish();
+      return;
+    }
+    finish();
+  });
+
+  $('#voice-cancel').addEventListener('click', () => {
+    releaseMic();
+    mode = 'typing';
+    syncSetup();
+    saveSettings();
+    showTypingDock();
+  });
 
   document.addEventListener('visibilitychange', () => {
     if (practiceEl.hidden) return;
     if (document.hidden) {
-      pauseTimer(); // 切走时不计时
-      // 先放下麦克风，回来再继续听
-      if (recognitionAvailable && listening) {
-        try { recognition.stop(); } catch (_) { /* 忽略 */ }
-      }
-    } else {
-      if (!awaitingNext) resumeTimer();
-      requestWakeLock();
-      if (mode === 'voice' && wantListening && !locked) startListening();
-    }
-  });
-
-  function vibrate(pattern) {
-    try { navigator.vibrate?.(pattern); } catch (_) { /* 不支持则跳过 */ }
-  }
-
-  // ---------- 中文数字解析 ----------
-  function parseSpokenNumber(text) {
-    if (!text) return null;
-    let s = text
-      .replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
-      .replace(/[，。、；：？！\s.,]/g, '');
-    if (!s) return null;
-
-    // 纯阿拉伯数字
-    if (/^-?\d+$/.test(s)) return Number(s);
-    // 含阿拉伯数字但无中文数字字，取数字部分
-    if (/\d/.test(s) && !/[零一二三四五六七八九十百千两幺〇]/.test(s)) {
-      return Number(s.replace(/[^\d]/g, ''));
-    }
-
-    const digits = {
-      '零': 0, '〇': 0, '一': 1, '幺': 1, '二': 2, '两': 2,
-      '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9,
-    };
-    const units = { '十': 10, '百': 100, '千': 1000 };
-    let negative = false;
-    let total = 0;
-    let section = 0;
-    let run = null; // 当前连续数字段（如逐位读的“一二三”）
-    let found = false;
-
-    for (const ch of s) {
-      if (ch === '负') {
-        negative = true;
-      } else if (/[0-9]/.test(ch)) {
-        run = run === null ? Number(ch) : run * 10 + Number(ch);
-        found = true;
-      } else if (has(digits, ch)) {
-        run = run === null ? digits[ch] : run * 10 + digits[ch];
-        found = true;
-      } else if (has(units, ch)) {
-        section += (run === null ? 1 : run) * units[ch];
-        run = null;
-        found = true;
-      }
-      // 其余字符（如“答案是”）直接跳过
-    }
-    if (!found) return null;
-    const result = total + section + (run === null ? 0 : run);
-    return negative ? -result : result;
-  }
-
-  function has(table, key) {
-    return Object.prototype.hasOwnProperty.call(table, key);
-  }
-
-  // ---------- 反馈 ----------
-  function setFeedback(message, kind = '') {
-    feedbackEl.textContent = message;
-    feedbackEl.className = `feedback ${kind}`.trim();
-  }
-
-  // ---------- 事件绑定 ----------
-  $('#start-button').addEventListener('click', () => startSession());
-  $('#again-button').addEventListener('click', () => startSession());
-  $('#review-button').addEventListener('click', () => startSession({ review: true }));
-  $('#settings-button').addEventListener('click', () => showView('setup'));
-  $('#quit-button').addEventListener('click', finishSession);
-  nextButton.addEventListener('click', nextQuestion);
-  $('#skip-button').addEventListener('click', skipQuestion);
-
-  answerForm.addEventListener('submit', (event) => {
-    event.preventDefault();
-    if (awaitingNext) {
-      nextQuestion();
-      return;
-    }
-    if (locked) return; // 上一题还在判分，忽略这次提交
-    const raw = answerInput.value
-      .replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
-      .replace(/[\s,，]/g, '');
-    if (!raw) {
-      setFeedback('先输入答案。', 'bad');
-      return;
-    }
-    if (!/^-?\d+$/.test(raw)) {
-      setFeedback('请输入数字。', 'bad');
-      return;
-    }
-    checkAnswer(Number(raw));
-  });
-
-  voiceButton.addEventListener('click', () => {
-    if (locked || practiceEl.hidden) return;
-    if (!recognitionAvailable) {
-      setFeedback('当前浏览器不支持语音识别，请改用打字作答。', 'bad');
-      return;
-    }
-    if (listening) {
+      pauseTimer();
       stopListening();
-    } else {
-      wantListening = true;
-      silenceCount = 0;
-      startListening();
+    } else if (!locked) {
+      resumeTimer();
+      if (mode === 'voice' && model) startListening();
     }
-  });
-
-  $('#voice-fallback').addEventListener('click', () => {
-    stopListening();
-    mode = 'typing';
-    saveSettings();
-    syncChoiceUI();
-    updateModeUI();
-    setFeedback('已切换为打字作答。');
-    answerInput.focus({ preventScroll: true });
   });
 
   // ---------- 初始化 ----------
-  syncChoiceUI();
+  syncSetup();
   updateVoiceNote();
-  updateModeUI();
+  if (!voiceSupported && mode === 'voice') {
+    mode = 'typing';
+    syncSetup();
+  }
 })();
