@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - arena/2f39412d-kousuan
   workflow_dispatch:
 
 permissions:
