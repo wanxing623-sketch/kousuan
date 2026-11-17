@@ -1,0 +1,20 @@
+{
+  "name": "速算练习",
+  "short_name": "速算",
+  "description": "两位数、三位数的加减法口算练习，支持键盘输入与语音作答。",
+  "lang": "zh-CN",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#faf8f4",
+  "theme_color": "#faf8f4",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
