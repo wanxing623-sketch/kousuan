@@ -55,8 +55,11 @@ button { cursor: pointer; }
 }
 
 .app-shell {
+  width: calc(100% - 40px);
   width: min(100% - 40px, 680px);
+  max-width: 680px;
   margin: 0 auto;
+  padding: 24px 0;
   padding: calc(24px + env(safe-area-inset-top)) 0 calc(24px + env(safe-area-inset-bottom));
 }
 
@@ -72,7 +75,6 @@ button { cursor: pointer; }
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
   color: var(--ink);
   font-size: 16px;
   font-weight: 700;
@@ -84,6 +86,7 @@ button { cursor: pointer; }
   display: grid;
   place-items: center;
   width: 29px;
+  margin-right: 10px;
   height: 29px;
   border-radius: 9px;
   background: var(--orange-wash);
@@ -133,7 +136,6 @@ button { cursor: pointer; }
 .mode-card {
   display: flex;
   align-items: center;
-  gap: 11px;
   height: 70px;
   padding: 0 12px;
   border: 1px solid var(--line);
@@ -157,6 +159,7 @@ button { cursor: pointer; }
   flex: none;
   width: 34px;
   height: 34px;
+  margin-right: 11px;
   border-radius: 10px;
   background: var(--orange-wash);
   color: var(--orange);
@@ -169,13 +172,13 @@ button { cursor: pointer; }
 .mode-copy {
   display: flex;
   flex-direction: column;
-  gap: 3px;
   min-width: 0;
 }
 
 .mode-copy strong { font-size: 12.5px; font-weight: 700; }
 
 .mode-copy small {
+  margin-top: 3px;
   font-size: 10.5px;
   color: #8f95a4;
   line-height: 1.35;
@@ -222,7 +225,6 @@ button { cursor: pointer; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 5px;
   height: 85px;
   padding: 10px 6px 8px;
   border: 1px solid var(--line);
@@ -253,6 +255,7 @@ button { cursor: pointer; }
 }
 
 .difficulty-card strong {
+  margin-top: 5px;
   font-size: 10px;
   font-weight: 600;
   color: var(--ink-soft);
@@ -300,7 +303,6 @@ button { cursor: pointer; }
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
   width: 100%;
   height: 47px;
   border: 0;
@@ -317,7 +319,7 @@ button { cursor: pointer; }
 
 .primary-button:active { transform: translateY(1px); }
 
-.button-arrow { font-size: 17px; font-weight: 400; }
+.button-arrow { margin-left: 12px; font-size: 17px; font-weight: 400; }
 
 /* ---------- practice ---------- */
 
@@ -405,7 +407,6 @@ button { cursor: pointer; }
 
 #answer-form {
   display: flex;
-  gap: 8px;
   max-width: 390px;
   margin: 18px auto 0;
 }
@@ -435,6 +436,7 @@ button { cursor: pointer; }
 
 .submit-button {
   flex: none;
+  margin-left: 8px;
   height: 47px;
   padding: 0 17px;
   border: 0;
@@ -458,7 +460,6 @@ button { cursor: pointer; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 9px;
   min-height: 46px;
   padding: 0 22px;
   border: 0;
@@ -470,7 +471,7 @@ button { cursor: pointer; }
   transition: background-color .2s ease, color .2s ease;
 }
 
-.voice-button .voice-icon { display: grid; place-items: center; }
+.voice-button .voice-icon { display: grid; place-items: center; margin-right: 9px; }
 
 .voice-button svg { width: 17px; height: 17px; }
 
@@ -504,9 +505,10 @@ button { cursor: pointer; }
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 8px;
   margin-top: 10px;
 }
+
+.voice-actions .mini-button { margin: 4px; }
 
 .mini-button {
   min-height: 38px;
@@ -576,7 +578,6 @@ button { cursor: pointer; }
 .result-stats div {
   display: flex;
   flex-direction: column;
-  gap: 5px;
   border-right: 1px solid #e9eaf0;
 }
 
@@ -588,7 +589,7 @@ button { cursor: pointer; }
   font-variant-numeric: tabular-nums;
 }
 
-.result-stats span { font-size: 10px; color: #969ba8; }
+.result-stats span { margin-top: 5px; font-size: 10px; color: #969ba8; }
 
 .result-meta {
   font-size: 11px;
@@ -596,10 +597,11 @@ button { cursor: pointer; }
   font-variant-numeric: tabular-nums;
 }
 
+.mistakes li + li { margin-top: 6px; }
+
 .mistakes {
   display: flex;
   flex-direction: column;
-  gap: 6px;
   max-height: 30vh;
   margin: 16px 0 0;
   padding: 12px 14px;
@@ -614,13 +616,12 @@ button { cursor: pointer; }
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
   font-size: 12.5px;
   color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
 }
 
-.mistakes .mine { color: var(--red); }
+.mistakes .mine { margin-left: 12px; color: var(--red); }
 
 .results-panel .primary-button { margin-top: 20px; }
 
@@ -666,7 +667,9 @@ input:focus-visible {
 
 @media (max-width: 560px) {
   .app-shell {
+    width: calc(100% - 28px);
     width: min(100% - 28px, 680px);
+    padding-top: 16px;
     padding-top: calc(16px + env(safe-area-inset-top));
   }
 
@@ -694,7 +697,7 @@ input:focus-visible {
 
   .question { font-size: 38px; }
 
-  #answer-form { gap: 6px; }
+  .submit-button { margin-left: 6px; }
 
   .submit-button { padding: 0 12px; }
 
