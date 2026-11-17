@@ -35,14 +35,14 @@ python3 -m http.server 8000
 
 ## 部署到 GitHub Pages
 
-在 GitHub 仓库的 **Settings → Pages** 中，将发布来源设为 `Deploy from a branch`，选择默认分支和 `/ (root)`，保存后即可通过 GitHub Pages 访问。仓库自带 `.github/workflows/pages.yml`。
+仓库自带 `.github/workflows/pages.yml`，推送到 `main` 后自动发布（发布环境只允许 `main` 部署，功能分支的推送不会触发发布）。首次使用请在 GitHub 仓库 **Settings → Pages** 中把发布来源设为 **GitHub Actions**。
 
 ## 目录
 
 - `index.html` — 页面结构
 - `app.js` — 题目生成、计时、语音识别与中文数字解析
 - `styles.css` — 样式（移动端优先，支持深色模式）
-- `fonts/` — 按页面用字裁剪的 Noto Sans SC（SIL OFL 1.1，许可证见 `fonts/OFL.txt`），两个字重合计约 240KB，离线可用（字体加载失败时自动回落到系统字体）
+- `fonts/` — 按页面用字裁剪的 Noto Sans SC（SIL OFL 1.1，许可证见 `fonts/OFL.txt`），两个字重合计约 185KB，离线可用（字体加载失败时自动回落到系统字体）
 
 ## 一些设计取舍
 

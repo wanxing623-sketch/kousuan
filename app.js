@@ -537,7 +537,18 @@
   }
 
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && !practiceEl.hidden) requestWakeLock();
+    if (practiceEl.hidden) return;
+    if (document.hidden) {
+      pauseTimer(); // 切走时不计时
+      // 先放下麦克风，回来再继续听
+      if (recognitionAvailable && listening) {
+        try { recognition.stop(); } catch (_) { /* 忽略 */ }
+      }
+    } else {
+      if (!awaitingNext) resumeTimer();
+      requestWakeLock();
+      if (mode === 'voice' && wantListening && !locked) startListening();
+    }
   });
 
   function vibrate(pattern) {
