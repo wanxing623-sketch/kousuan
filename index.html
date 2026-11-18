@@ -1295,13 +1295,16 @@ const OfflineVoice = (() => {
   // 既能说「八 十 三」也能逐位说「八 三」；不向解码器透露题目或正确答案。
   function numberGrammar() {
     const digits = '零一二三四五六七八九两幺'.split('');
-    // Keep the decoder vocabulary numeric-only: do not add <UNK> or phrases such as
-    // "答案是" that let ordinary speech enter the number grammar.
-    const phrases = ['一 千', '十'].concat(digits);
-    digits.forEach(d => {
-      phrases.push(`十 ${d}`, `${d} 十 ${d}`, `${d} 百 ${d}`, `百 零 ${d}`, `千 ${d}`);
-      digits.forEach(next => phrases.push(`${d} ${next}`));
+    const units = ['十', '百', '千'];
+    // Vosk estimates a bigram grammar from these phrases. Add only numeric
+    // transitions, but cover complete cardinal numbers and digit-by-digit speech.
+    const phrases = digits.concat(units);
+    digits.forEach(digit => {
+      digits.forEach(next => phrases.push(`${digit} ${next}`));
+      units.forEach(unit => phrases.push(`${digit} ${unit}`));
+      phrases.push(`十 ${digit}`, `百 ${digit}`, `千 ${digit}`, `零 ${digit}`);
     });
+    phrases.push('百 零');
     return JSON.stringify(phrases);
   }
 
@@ -1354,10 +1357,22 @@ const OfflineVoice = (() => {
         if (decoder) armSilence();
       }, 10000);
     }
+    let voiceStartedAt = 0;
+    let lastVoiceAt = 0;
+    let finalRequested = false;
     function decode() {
       const d = decoder = new model.KaldiRecognizer(capture.ctx.sampleRate, grammar);
+      voiceStartedAt = 0;
+      lastVoiceAt = 0;
+      finalRequested = false;
       function heard(text, final) {
-        if (d !== decoder || !text) return;
+        if (d !== decoder) return;
+        if (final) {
+          voiceStartedAt = 0;
+          lastVoiceAt = 0;
+          finalRequested = false;
+        }
+        if (!text) return;
         armSilence();
         events.text([text], final);
       }
@@ -1377,9 +1392,13 @@ const OfflineVoice = (() => {
       const c = capture = {};
       try {
         // iOS：在「开始/继续」的用户手势内解锁音频并请求权限，不等模型加载完成。
-        c.ctx = new Audio();
+        // Mandarin Vosk models are trained for 16 kHz speech. Let Web Audio resample
+        // at the device boundary so the worker decodes one third as many samples on
+        // common 48 kHz phones; fall back cleanly on older Safari implementations.
+        try { c.ctx = new Audio({ sampleRate: 16000 }); }
+        catch (_) { c.ctx = new Audio(); }
         const unlock = c.ctx.resume();
-        const permission = navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true }, video: false })
+        const permission = navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: { ideal: 16000 }, echoCancellation: true, noiseSuppression: true }, video: false })
           .then(stream => {
             if (c !== capture) { stream.getTracks().forEach(track => track.stop()); return; }
             c.stream = stream;
@@ -1392,13 +1411,34 @@ const OfflineVoice = (() => {
         await Promise.all([unlock, permission, getModel()]);
         if (c !== capture) return;
         c.source = c.ctx.createMediaStreamSource(c.stream);
-        // ScriptProcessor 同时覆盖没有 AudioWorklet 的移动 Safari；输出缓冲区保持静音。
-        // Smaller audio blocks reduce input latency on phones without creating the
-        // very high callback overhead of 512-sample blocks.
-        c.node = c.ctx.createScriptProcessor(2048, 1, 1);
+        // ScriptProcessor also supports mobile Safari versions without AudioWorklet.
+        c.node = c.ctx.createScriptProcessor(1024, 1, 1);
         c.node.onaudioprocess = event => {
           if (c !== capture || !decoder) return;
-          try { decoder.acceptWaveform(event.inputBuffer); } catch (_) { events.error('offline-engine'); }
+          try {
+            const buffer = event.inputBuffer;
+            decoder.acceptWaveform(buffer);
+
+            // Finalize after a short quiet tail instead of waiting for Vosk's more
+            // conservative endpoint timeout. Sample the RMS cheaply on-device.
+            const samples = buffer.getChannelData(0);
+            let energy = 0, count = 0;
+            for (let i = 0; i < samples.length; i += 4) {
+              energy += samples[i] * samples[i];
+              count += 1;
+            }
+            const now = performance.now();
+            const rms = Math.sqrt(energy / Math.max(1, count));
+            if (rms >= 0.008) {
+              if (!voiceStartedAt || finalRequested) voiceStartedAt = now;
+              finalRequested = false;
+              lastVoiceAt = now;
+            } else if (voiceStartedAt && !finalRequested && now - voiceStartedAt >= 120
+              && now - lastVoiceAt >= 420) {
+              finalRequested = true;
+              decoder.retrieveFinalResult();
+            }
+          } catch (_) { events.error('offline-engine'); }
         };
         c.source.connect(c.node);
         c.node.connect(c.ctx.destination);
