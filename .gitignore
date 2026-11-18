@@ -3,3 +3,7 @@
 
 # 系统文件
 .DS_Store
+
+# 发布产物（含语音模型）和本地回归依赖
+dist/
+node_modules/

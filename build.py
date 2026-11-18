@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""把 src/ 里的样式和脚本内联进 index.html，生成单文件页面。
-
-单文件是刻意的：这个页面被反复吐槽「链接点开没反应」，根因几乎都是
-新 HTML 配了旧的 app.js / styles.css（或其中一个请求被拦）。合成一个
-文件之后，这种新旧混搭在物理上就不可能发生。
-"""
+"""内联核心页面。--site 另生成带同源语音包的静态发布目录（大文件不进 Git）。"""
+import argparse
+import hashlib
+import json
 import pathlib
+import shutil
+import urllib.request
 
-ROOT = pathlib.Path(__file__).parent
+ROOT = pathlib.Path(__file__).resolve().parent
+BLOBS = 'https://api.github.com/repos/ccoreilly/vosk-browser/git/blobs/'
 
 
 def read(name):
@@ -15,25 +16,47 @@ def read(name):
 
 
 def escape(code):
-    """避免源码里的闭合标签提前结束 <script>/<style>。"""
     return code.replace('</script', '<\\/script').replace('</style', '<\\/style')
 
 
+def mirror(item, target):
+    if target.exists() and hashlib.sha256(target.read_bytes()).hexdigest() == item['sha256']:
+        return
+    request = urllib.request.Request(BLOBS + item['blob'], headers={'Accept': 'application/vnd.github.raw+json'})
+    with urllib.request.urlopen(request, timeout=90) as response:
+        data = response.read(item['size'] + 1)
+    if len(data) != item['size'] or hashlib.sha256(data).hexdigest() != item['sha256']:
+        raise SystemExit('语音资源校验失败：' + item['file'])
+    target.write_bytes(data)
+
+
 def main():
-    page = read('page.html')
-    css = escape(read('styles.css')).rstrip()
-    js = escape(read('app.js')).rstrip()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--site', action='store_true', help='准备 dist/（需要首次联网）')
+    site = parser.parse_args().site
+    out = ROOT / 'dist' if site else ROOT
+    files = json.loads(read('voice-pack.json'))
+    if site:
+        assets = out / 'voice-assets'
+        assets.mkdir(parents=True, exist_ok=True)
+        for item in files:
+            mirror(item, assets / item['file'])
+        for name in ['sw.js', 'manifest.webmanifest', 'icon.svg', 'icon-180.png', 'icon-512.png']:
+            shutil.copyfile(ROOT / name, out / name)
+        shutil.copytree(ROOT / 'third_party', out / 'third_party', dirs_exist_ok=True)
 
-    html = page.replace('<!--@styles-->', '<style>\n' + css + '\n  </style>')
-    html = html.replace('<!--@app-->', '<script>\n' + js + '\n  </script>')
-
+    for item in files:
+        item['path'] = './voice-assets/' + item['file']
+        # 带参数的是用户主动安装的网络请求，无参数路径只读取已校验的副本。
+        item['source'] = item['path'] + '?install' if site else BLOBS + item['blob']
+    pack = json.dumps(files, separators=(',', ':'))
+    js = read('offline.js').replace('/*@files*/[]', pack) + '\n' + read('app.js')
+    html = read('page.html').replace('<!--@styles-->', '<style>\n' + escape(read('styles.css')) + '  </style>')
+    html = html.replace('<!--@app-->', '<script>\n' + escape(js) + '\n  </script>')
     if '<!--@' in html:
         raise SystemExit('还有没替换的占位符')
-
-    out = ROOT / 'index.html'
-    out.write_text(html, encoding='utf-8')
-    print(f'{out.name}  {len(html.encode()) / 1024:.1f} KB  '
-          f'(css {len(css.encode()) / 1024:.1f} KB + js {len(js.encode()) / 1024:.1f} KB)')
+    (out / 'index.html').write_text(html, encoding='utf-8')
+    print(f'{out.name}/index.html  {len(html.encode()) / 1024:.1f} KB')
 
 
 if __name__ == '__main__':
