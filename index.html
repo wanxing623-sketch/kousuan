@@ -677,6 +677,10 @@ input:focus-visible {
   outline-offset: 2px;
 }
 
+/* View headings receive programmatic focus for screen-reader context, not interaction. */
+#welcome-title:focus,
+#setup-title:focus { outline: none; }
+
 .mode-card:focus-visible,
 .difficulty-card:focus-visible,
 .quantity-option:focus-visible { outline-offset: 1px; }
@@ -1974,11 +1978,17 @@ const OfflineVoice = (() => {
       ball.x = ball.body.position.x - ball.radius;
       ball.y = ball.body.position.y - ball.radius;
     }
-    ball.node.style.transform = `translate3d(${Math.round(ball.x)}px, ${Math.round(ball.y)}px, 0)`;
+    const x = Math.round(ball.x), y = Math.round(ball.y);
+    if (x === ball.renderX && y === ball.renderY) return;
+    ball.renderX = x;
+    ball.renderY = y;
+    ball.node.style.transform = `translate3d(${x}px, ${y}px, 0)`;
   }
 
   function stopBubbles() {
     if (bubbleGame && bubbleGame.frame) cancelAnimationFrame(bubbleGame.frame);
+    if (bubbleGame && bubbleGame.resizeObserver) bubbleGame.resizeObserver.disconnect();
+    if (bubbleGame && bubbleGame.onResize) window.removeEventListener('resize', bubbleGame.onResize);
     if (bubbleGame) bubbleGame.bubbles.forEach(ball => { if (ball.removeTimer) clearTimeout(ball.removeTimer); });
     if (bubbleGame && bubbleGame.engine) window.Matter.Engine.clear(bubbleGame.engine);
     bubbleGame = null;
@@ -2039,6 +2049,29 @@ const OfflineVoice = (() => {
     game.height = height;
   }
 
+  function resizeBubbleGame(game, width, height) {
+    if (!width || !height || bubbleGame !== game
+      || (Math.abs(width - game.width) <= 1 && Math.abs(height - game.height) <= 1)) return;
+    resetBubbleWalls(game, width, height);
+    game.bubbles.forEach(ball => {
+      const x = clamp(ball.body.position.x, ball.radius, width - ball.radius);
+      const y = clamp(ball.body.position.y, ball.radius, height - ball.radius);
+      window.Matter.Body.setPosition(ball.body, { x, y });
+    });
+  }
+
+  function watchBubbleSize(game) {
+    if (window.ResizeObserver) {
+      game.resizeObserver = new ResizeObserver(() => {
+        resizeBubbleGame(game, game.field.clientWidth, game.field.clientHeight);
+      });
+      game.resizeObserver.observe(game.field);
+    } else {
+      game.onResize = () => resizeBubbleGame(game, game.field.clientWidth, game.field.clientHeight);
+      window.addEventListener('resize', game.onResize);
+    }
+  }
+
   function renderBubbles() {
     stopBubbles();
     const field = el('bubble-field');
@@ -2061,8 +2094,8 @@ const OfflineVoice = (() => {
     const engine = Matter.Engine.create({ enableSleeping: false });
     engine.gravity.x = 0;
     engine.gravity.y = 0;
-    engine.positionIterations = 5;
-    engine.velocityIterations = 4;
+    engine.positionIterations = 4;
+    engine.velocityIterations = 3;
     const game = bubbleGame = { field, bubbles: [], width, height, frame: 0, lastFrame: 0, accumulator: 0, engine, walls: [] };
     resetBubbleWalls(game, width, height);
     options.forEach((value, i) => {
@@ -2106,6 +2139,7 @@ const OfflineVoice = (() => {
       node.addEventListener('click', () => chooseBubble(ball.value, node));
     });
 
+    watchBubbleSize(game);
     if (!reducedMotion) startBubbleAnimation();
   }
 
@@ -2117,10 +2151,6 @@ const OfflineVoice = (() => {
         if (game) game.frame = 0;
         return;
       }
-      const rect = game.field.getBoundingClientRect();
-      if (Math.abs(rect.width - game.width) > 1 || Math.abs(rect.height - game.height) > 1) {
-        resetBubbleWalls(game, rect.width, rect.height);
-      }
       const delta = game.lastFrame ? Math.min(now - game.lastFrame, 50) : BUBBLE_STEP;
       game.lastFrame = now;
       game.accumulator += delta;
@@ -2129,14 +2159,15 @@ const OfflineVoice = (() => {
         game.accumulator -= BUBBLE_STEP;
       }
       game.bubbles.forEach(ball => {
-        if (now < ball.nextSteerAt) return;
-        const velocity = ball.body.velocity;
-        const angle = Math.atan2(velocity.y, velocity.x) + (Math.random() - .5) * .6;
-        const speed = clamp(Math.hypot(velocity.x, velocity.y) + (Math.random() - .5) * .12, .58, 1.06);
-        window.Matter.Body.setVelocity(ball.body, { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed });
-        ball.nextSteerAt = now + randomInt(1100, 2200);
+        if (now >= ball.nextSteerAt) {
+          const velocity = ball.body.velocity;
+          const angle = Math.atan2(velocity.y, velocity.x) + (Math.random() - .5) * .6;
+          const speed = clamp(Math.hypot(velocity.x, velocity.y) + (Math.random() - .5) * .12, .58, 1.06);
+          window.Matter.Body.setVelocity(ball.body, { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed });
+          ball.nextSteerAt = now + randomInt(1100, 2200);
+        }
+        setBubblePosition(ball);
       });
-      game.bubbles.forEach(setBubblePosition);
       game.frame = requestAnimationFrame(tick);
     };
     bubbleGame.frame = requestAnimationFrame(tick);
