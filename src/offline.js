@@ -110,7 +110,9 @@ const OfflineVoice = (() => {
   // 既能说「八 十 三」也能逐位说「八 三」；不向解码器透露题目或正确答案。
   function numberGrammar() {
     const digits = '零一二三四五六七八九两幺'.split('');
-    const phrases = ['<UNK>', '答案 是', '等于', '一 千', '十'].concat(digits);
+    // Keep the decoder vocabulary numeric-only: do not add <UNK> or phrases such as
+    // "答案是" that let ordinary speech enter the number grammar.
+    const phrases = ['一 千', '十'].concat(digits);
     digits.forEach(d => {
       phrases.push(`十 ${d}`, `${d} 十 ${d}`, `${d} 百 ${d}`, `百 零 ${d}`, `千 ${d}`);
       digits.forEach(next => phrases.push(`${d} ${next}`));
