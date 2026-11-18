@@ -967,6 +967,7 @@ const OfflineVoice = (() => {
   const files = [{"file":"vosk-browser-0.0.8.js","blob":"d7b7c552f747e78b5715a902929807e762008c4c","size":5804767,"sha256":"29504515526e974f4cb053cf08811c4de5fb2a74007c0a5a957db50eaa8d5d0c","type":"application/javascript","path":"./voice-assets/vosk-browser-0.0.8.js","source":"https://api.github.com/repos/ccoreilly/vosk-browser/git/blobs/d7b7c552f747e78b5715a902929807e762008c4c"},{"file":"vosk-model-small-cn-0.3.tar.gz","blob":"d4ec3b63324b8f012407866cbe6a65a86a7d1e01","size":33235437,"sha256":"22cfe38dd2a9f5a8791c8dcd6442d44db68f8bf15ca10ca4150fea6e0946b119","type":"application/gzip","path":"./voice-assets/vosk-model-small-cn-0.3.tar.gz","source":"https://api.github.com/repos/ccoreilly/vosk-browser/git/blobs/d4ec3b63324b8f012407866cbe6a65a86a7d1e01"}];
   const base = /^https?:/.test(document.baseURI) ? new URL('.', document.baseURI).href : '';
   const cacheName = 'kousuan-voice:' + base;
+  const shell = ['index.html', 'manifest.webmanifest', 'icon.svg', 'icon-180.png', 'icon-512.png'];
   const Audio = window.AudioContext || window.webkitAudioContext;
   const size = files.reduce((sum, file) => sum + file.size, 0);
 
@@ -984,6 +985,7 @@ const OfflineVoice = (() => {
   async function installed() {
     if (unsupported() || !(await caches.has(cacheName))) return false;
     const cache = await caches.open(cacheName);
+    if (!(await cache.match(new URL(shell[0], base).href))) return false;
     const hits = await Promise.all(files.map(file => cache.match(file.path)));
     return hits.every((hit, i) => hit && hit.headers.get('X-Pack-SHA256') === files[i].sha256);
   }
@@ -1008,8 +1010,20 @@ const OfflineVoice = (() => {
 
   async function install(signal, progress) {
     const check = () => { if (signal.aborted) throw new Error('已取消下载'); };
-    await ensureWorker();
+    // A single writer creates the cache before registering the Worker. A separate
+    // shell cache created by SW.install can be invisible to the page on WebKit.
     const cache = await caches.open(cacheName);
+    await ensureWorker();
+    check();
+    await Promise.all(shell.map(async name => {
+      const url = new URL(name, base).href;
+      const response = await fetch(url + '?install', { signal, cache: 'no-store' });
+      if (!response.ok) throw new Error(`离线页面下载失败（HTTP ${response.status}），请重试。`);
+      const headers = new Headers(response.headers);
+      // The body is decoded already; retain document security headers.
+      ['Content-Encoding', 'Content-Length', 'Cache-Control'].forEach(key => headers.delete(key));
+      await cache.put(url, new Response(await response.arrayBuffer(), { headers }));
+    }));
     let done = 0;
     for (const file of files) {
       check();
@@ -1049,6 +1063,7 @@ const OfflineVoice = (() => {
       progress(done, false);
     }
     check();
+    if (!(await installed())) throw new Error('未能完整保存离线页面和语音包，请检查浏览器存储后重试。');
   }
 
   let engineScript;

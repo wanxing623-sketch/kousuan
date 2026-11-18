@@ -51,10 +51,16 @@ module.exports = async function testReopen({ browserType, profile, base, wav, fi
     await waitForPack(page, 'idle');
     await page.click('#pack-button');
     await waitForPack(page, 'ready');
-    assert(await page.evaluate(async () => (await (await caches.match(new URL('index.html', document.baseURI))).text()).includes('kousuanReady')), 'The offline HTML must be readable before closing');
+    assert(await page.evaluate(async () => {
+      const cache = await caches.open('kousuan-voice:' + new URL('.', document.baseURI).href);
+      const html = await cache.match(new URL('index.html', document.baseURI).href);
+      return html && (await html.text()).includes('kousuanReady');
+    }), 'The offline HTML must be readable before closing');
     assert(await page.evaluate(() => !window.Vosk), 'The decoder must not be preloaded during installation');
   } catch (err) {
-    throw await explain('install', err);
+    const reason = await explain('install', err);
+    reason.message += '\nStored after install: ' + await cacheReport(ctx, base).catch(e => e.message);
+    throw reason;
   } finally {
     await ctx.close();
   }
