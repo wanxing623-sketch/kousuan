@@ -662,6 +662,10 @@ input:focus-visible {
   outline-offset: 2px;
 }
 
+/* View headings receive programmatic focus for screen-reader context, not interaction. */
+#welcome-title:focus,
+#setup-title:focus { outline: none; }
+
 .mode-card:focus-visible,
 .difficulty-card:focus-visible,
 .quantity-option:focus-visible { outline-offset: 1px; }
