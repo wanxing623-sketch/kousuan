@@ -3,8 +3,12 @@
 import argparse
 import hashlib
 import json
+import os
 import pathlib
 import shutil
+import sys
+import time
+import urllib.error
 import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent
@@ -23,10 +27,22 @@ def mirror(item, target):
     if target.exists() and hashlib.sha256(target.read_bytes()).hexdigest() == item['sha256']:
         return
     request = urllib.request.Request(BLOBS + item['blob'], headers={'Accept': 'application/vnd.github.raw+json'})
-    with urllib.request.urlopen(request, timeout=90) as response:
-        data = response.read(item['size'] + 1)
+    # CI runners share IP-based anonymous API limits. Use the job's ephemeral read token
+    # only on the fixed API request (not on redirects, and never in the built page).
+    if os.environ.get('GITHUB_ACTIONS') == 'true' and os.environ.get('GITHUB_TOKEN'):
+        request.add_unredirected_header('Authorization', 'Bearer ' + os.environ['GITHUB_TOKEN'])
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(request, timeout=90) as response:
+                data = response.read(item['size'] + 1)
+            break
+        except (OSError, TimeoutError) as error:
+            transient = not isinstance(error, urllib.error.HTTPError) or error.code in (408, 429, 500, 502, 503, 504)
+            if not transient or attempt == 2:
+                raise RuntimeError(f"无法下载 {item['file']}：{error}") from error
+            time.sleep(2 ** attempt)
     if len(data) != item['size'] or hashlib.sha256(data).hexdigest() != item['sha256']:
-        raise SystemExit('语音资源校验失败：' + item['file'])
+        raise RuntimeError('语音资源校验失败：' + item['file'])
     target.write_bytes(data)
 
 
@@ -60,4 +76,10 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except (OSError, RuntimeError) as exc:
+        if os.environ.get('GITHUB_ACTIONS') == 'true':
+            message = str(exc).replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+            print('::error title=Site build::' + message)
+        sys.exit(str(exc))

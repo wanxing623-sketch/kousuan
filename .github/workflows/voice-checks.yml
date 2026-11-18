@@ -26,7 +26,14 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
+      - name: Reuse verified voice assets
+        uses: actions/cache@v5
+        with:
+          path: dist/voice-assets
+          key: voice-assets-${{ hashFiles('src/voice-pack.json') }}
       - name: Verify tracked page and build Pages layout
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           python3 build.py
           git diff --exit-code -- index.html
