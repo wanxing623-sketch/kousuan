@@ -12,14 +12,29 @@ module.exports = async function testReopen({ browserType, profile, base, wav, fi
   const options = { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true };
   if (browserType.name() === 'chromium') options.executablePath = process.env.CHROMIUM_PATH;
   const open = () => browserType.launchPersistentContext(profile, options);
+  const messages = [];
+  let page;
+  function observe(p) {
+    p.on('console', msg => { if (msg.type() === 'error') messages.push(msg.text().slice(0, 240)); });
+    p.on('pageerror', err => messages.push(err.message.slice(0, 240)));
+    p.on('requestfailed', req => messages.push(`${req.method()} ${req.url().slice(0, 150)}: ${req.failure().errorText}`));
+    return p;
+  }
+  async function explain(stage, error) {
+    const state = page && await page.evaluate(() => ['pack-state', 'pack-message', 'voice-label', 'voice-hint', 'heard-text', 'feedback']
+      .map(id => document.getElementById(id)?.textContent).filter(Boolean).join(' | ')).catch(() => 'page unavailable');
+    return new Error(`${stage}: ${error.message}\nUI: ${state || 'no page'}\nBrowser: ${messages.slice(-6).join('; ')}`);
+  }
   let ctx = await open();
   try {
-    const page = await ctx.newPage();
+    page = observe(await ctx.newPage());
     await page.goto(base);
     await waitForPack(page, 'idle');
     await page.click('#pack-button');
     await waitForPack(page, 'ready');
     assert(await page.evaluate(() => !window.Vosk), 'The decoder must not be preloaded during installation');
+  } catch (err) {
+    throw await explain('install', err);
   } finally {
     await ctx.close();
   }
@@ -44,8 +59,7 @@ module.exports = async function testReopen({ browserType, profile, base, wav, fi
         return output.stream;
       };
     }, fs.readFileSync(wav).toString('base64'));
-    const page = await ctx.newPage();
-    page.on('pageerror', error => console.error('Browser error:', error.message));
+    page = observe(await ctx.newPage());
     await page.goto(base + '?reopened');
     await waitForPack(page, 'ready');
     await page.click('#pack-button');
@@ -60,6 +74,8 @@ module.exports = async function testReopen({ browserType, profile, base, wav, fi
     assert.equal(await page.textContent('#result-correct'), '1', await page.textContent('#mistakes'));
     assert.equal(await page.evaluate(() => window.fixtureTrack.readyState), 'ended');
     console.log(`✓ ${browserType.name()} persistent profile: install → close browser → reopen offline → real WAV → 83 → score`);
+  } catch (err) {
+    throw await explain('offline reopen', err);
   } finally {
     await ctx.close();
     disconnect(false);

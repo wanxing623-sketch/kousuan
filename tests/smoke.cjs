@@ -237,4 +237,11 @@ async function testNative(browser, base) {
     server.close();
     fs.rmSync(tmp, { recursive: true, force: true });
   }
-})().catch(error => { console.error(error); process.exitCode = 1; });
+})().catch(error => {
+  console.error(error);
+  if (process.env.GITHUB_ACTIONS) {
+    const message = error.message.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+    console.log(`::error title=${browserType.name()} voice check::${message}`);
+  }
+  process.exitCode = 1;
+});
