@@ -1000,12 +1000,12 @@ body { background: #f5f6f3; }
             <span class="mode-icon voice-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5v3"/></svg>
             </span>
-            <span class="mode-copy"><strong>语音作答</strong><small>看题后直接说出答案</small></span>
+            <span class="mode-copy"><strong>语音作答</strong><small>只说数字，例如“八十三”</small></span>
             <span class="radio-dot" aria-hidden="true"></span>
           </button>
         </div>
         <p class="support-note" id="voice-note" hidden>这个浏览器不支持语音识别，先用打字作答也可以。</p>
-        <p class="support-note tip" id="voice-tip" hidden>开始后请允许麦克风，说完答案会自动进入下一题。</p>
+        <p class="support-note tip" id="voice-tip" hidden>开始后请允许麦克风，只说数字即可。</p>
       </fieldset>
 
       <fieldset class="setting-group">
@@ -1295,7 +1295,9 @@ const OfflineVoice = (() => {
   // 既能说「八 十 三」也能逐位说「八 三」；不向解码器透露题目或正确答案。
   function numberGrammar() {
     const digits = '零一二三四五六七八九两幺'.split('');
-    const phrases = ['<UNK>', '答案 是', '等于', '一 千', '十'].concat(digits);
+    // Keep the decoder vocabulary numeric-only: do not add <UNK> or phrases such as
+    // "答案是" that let ordinary speech enter the number grammar.
+    const phrases = ['一 千', '十'].concat(digits);
     digits.forEach(d => {
       phrases.push(`十 ${d}`, `${d} 十 ${d}`, `${d} 百 ${d}`, `百 零 ${d}`, `千 ${d}`);
       digits.forEach(next => phrases.push(`${d} ${next}`));
@@ -1621,7 +1623,7 @@ const OfflineVoice = (() => {
       : supportsSpeech ? '浏览器识别 · 可能需要联网' : packRestriction ? '此浏览器不支持' : '先下载普通话语音包';
     el('voice-note').hidden = !voiceCard.disabled;
     el('voice-tip').hidden = prefs.mode !== 'voice';
-    el('voice-tip').textContent = offlineReady ? '将使用本机语音包。开始后请允许麦克风。' : '将使用浏览器语音服务，可能会联网。需要离线识别可先安装语音包。';
+    el('voice-tip').textContent = offlineReady ? '将使用本机语音包。开始后允许麦克风，只说数字即可。' : '将使用浏览器语音服务，可能会联网。只说数字；如需离线识别可先安装语音包。';
   }
 
   document.querySelectorAll('[data-mode]').forEach((button) => {
@@ -1783,7 +1785,7 @@ const OfflineVoice = (() => {
 
     renderQuestion();
     el('answer').value = '';
-    setFeedback(prefs.mode === 'voice' ? '看着题目，直接说出答案' : '仔细想一想，输入你的答案');
+    setFeedback(prefs.mode === 'voice' ? '看着题目，只说数字' : '仔细想一想，输入你的答案');
     el('question').classList.remove('shake');
     updateMeta();
 
@@ -2012,38 +2014,8 @@ const OfflineVoice = (() => {
   };
   const CN_UNITS = { '十': 10, '拾': 10, '百': 100, '佰': 100, '千': 1000, '仟': 1000 };
 
-  /* 识别引擎常把数字听成同音字，例如「四」->「是」「寺」 */
-  const HOMOPHONES = {
-    '是': 4, '事': 4, '市': 4, '式': 4, '试': 4, '氏': 4, '似': 4, '寺': 4, '视': 4,
-    '示': 4, '世': 4, '室': 4, '适': 4, '释': 4, '势': 4, '伺': 4, '嗣': 4,
-    '依': 1, '衣': 1, '医': 1, '仪': 1, '移': 1, '伊': 1, '以': 1, '已': 1,
-    '而': 2, '儿': 2, '耳': 2, '尔': 2,
-    '山': 3, '伞': 3, '衫': 3, '善': 3, '散': 3,
-    '无': 5, '午': 5, '舞': 5, '武': 5, '物': 5, '务': 5, '误': 5, '雾': 5,
-    '溜': 6, '流': 6, '留': 6, '柳': 6, '绿': 6, '录': 6,
-    '齐': 7, '奇': 7, '妻': 7, '期': 7, '欺': 7,
-    '巴': 8, '拔': 8, '爸': 8, '罢': 8, '疤': 8,
-    '酒': 9, '久': 9, '旧': 9, '救': 9, '揪': 9,
-    '灵': 0, '铃': 0, '龄': 0, '另': 0, '领': 0,
-    '时': 10, '实': 10, '识': 10, '食': 10, '石': 10,
-    '白': 100, '摆': 100, '败': 100,
-    '千': 1000, '签': 1000, '前': 1000, '钱': 1000,
-  };
-
-  const NOISE = /[嗯啊哦呃喔诶欸唔呀哈唉哎噢哟哪]/g;
-  const FILLER_PHRASES = [
-    '答案是', '答案', '等于', '应该是', '大概是', '我觉得', '我认为', '我算',
-    '结果', '就是', '那个', '这个', '大概', '可能', '我猜', '数字',
-  ];
-
-  const DIGIT_CHARS = Object.keys(CN_DIGITS).join('');
-  const UNIT_CHARS = Object.keys(CN_UNITS).join('');
-  const SPOKEN_RUN = new RegExp(
-    `[${DIGIT_CHARS}]+[${UNIT_CHARS}][${DIGIT_CHARS}${UNIT_CHARS}]*`
-    + `|[${UNIT_CHARS}][${DIGIT_CHARS}${UNIT_CHARS}]*`
-    + `|[${DIGIT_CHARS}]+`,
-    'g'
-  );
+  // 只接受完整的数字表达式；包含其他汉字或文字时不参与判分。
+  const NUMERIC_SPEECH = /^(?:[0-9]+|[零〇一壹幺二两俩贰三叁四肆五伍六陆七柒八捌九玖十拾百佰千仟]+)$/;
 
   function normalizeSpeech(text) {
     return String(text || '')
@@ -2094,75 +2066,24 @@ const OfflineVoice = (() => {
     return total + (current || 0);
   }
 
-  function parseStrict(text) {
-    if (!text) return null;
+  function isNumericSpeech(text) {
+    return NUMERIC_SPEECH.test(normalizeSpeech(text));
+  }
 
-    const arabic = text.match(/\d+/g);
-    if (arabic) {
-      const longest = arabic.reduce((a, b) => (b.length > a.length ? b : a));
-      const value = Number(longest);
+  function parseStrict(text) {
+    if (!isNumericSpeech(text)) return null;
+    const normalized = normalizeSpeech(text);
+    if (/^[0-9]+$/.test(normalized)) {
+      const value = Number(normalized);
       return Number.isFinite(value) ? value : null;
     }
-
-    const runs = text.match(SPOKEN_RUN);
-    if (!runs) return null;
-
-    runs.sort((a, b) => {
-      const unitA = /[十拾百佰千仟]/.test(a) ? 1 : 0;
-      const unitB = /[十拾百佰千仟]/.test(b) ? 1 : 0;
-      if (unitA !== unitB) return unitB - unitA;
-      return b.length - a.length;
-    });
-
-    for (const run of runs) {
-      const value = evaluateChineseNumber(run);
-      if (value !== null) return value;
-    }
-    return null;
-  }
-
-  function stripFillers(text) {
-    let out = text.replace(NOISE, '');
-    FILLER_PHRASES.forEach((phrase) => {
-      out = out.split(phrase).join('');
-    });
-    return out;
-  }
-
-  /* 只在整个短句都能映射成数字时才使用同音字，避免把正常词句误判成数字 */
-  function mapHomophones(text) {
-    let out = '';
-    for (const ch of text) {
-      if (CN_DIGITS[ch] !== undefined || CN_UNITS[ch] !== undefined) {
-        out += ch;
-        continue;
-      }
-      const homophone = HOMOPHONES[ch];
-      if (homophone === undefined) return null;
-      out += homophone;
-    }
-    return out;
+    return evaluateChineseNumber(normalized);
   }
 
   function parseSpokenNumber(text) {
-    const normalized = normalizeSpeech(text);
-    if (!normalized) return null;
-
-    const strict = parseStrict(normalized);
-    if (strict !== null) return strict;
-
-    const trimmed = stripFillers(normalized);
-    if (trimmed && trimmed !== normalized) {
-      const cleaned = parseStrict(trimmed);
-      if (cleaned !== null) return cleaned;
-    }
-
-    const mapped = mapHomophones(trimmed || '');
-    if (mapped) {
-      const value = parseStrict(mapped);
-      if (value !== null && value <= 9999) return value;
-    }
-    return null;
+    const value = parseStrict(text);
+    // Even the largest supported exercise answer is below 2000.
+    return value !== null && value <= 1998 ? value : null;
   }
 
   let recognition = null;
@@ -2187,15 +2108,16 @@ const OfflineVoice = (() => {
     function transcript(alternatives, final) {
       if (!active() || !alternatives.length || !alternatives[0].trim()) return;
       silenceCount = 0;
-      const heard = alternatives[0].trim().replace(/<unk>/ig, '…');
-      if (el('heard-text').textContent !== heard) el('heard-text').textContent = heard;
+      const heard = alternatives[0].trim().replace(/<unk>/ig, '');
+      const numericHeard = isNumericSpeech(heard) ? normalizeSpeech(heard) : '';
+      if (el('heard-text').textContent !== numericHeard) el('heard-text').textContent = numericHeard;
       if (!final) return;
       for (const text of alternatives) {
-        if (/<unk>/i.test(text)) continue; // 有未听清的音节时不拿残缺的数字判分
+        if (!isNumericSpeech(text)) continue;
         const value = parseSpokenNumber(text);
         if (value !== null) { submit(value); return; }
       }
-      setFeedback('没听清，再说一次', 'bad');
+      setFeedback('只识别数字，请再说一次', 'bad');
     }
     function failed(code) {
       if (!active() || code === 'aborted') return;
@@ -2278,9 +2200,9 @@ const OfflineVoice = (() => {
     el('heard-text').textContent = '';
     el('voice-actions').hidden = true;
     el('new-tab').hidden = !inFrame;
-    el('voice-hint').textContent = '说完答案会自动进入下一题，点麦克风可暂停';
+    el('voice-hint').textContent = '只说数字，识别后自动进入下一题；点麦克风可暂停';
     el('feedback').className = 'feedback';
-    setFeedback('看着题目，直接说出答案');
+    setFeedback('看着题目，只说数字');
     setVoiceState('listening');
     listen();
   }
@@ -2385,7 +2307,7 @@ const OfflineVoice = (() => {
       wantListen = true;
       paused = false;
       el('voice-actions').hidden = true;
-      el('voice-hint').textContent = '说完答案会自动进入下一题，点麦克风可暂停';
+      el('voice-hint').textContent = '只说数字，识别后自动进入下一题；点麦克风可暂停';
       setVoiceState('listening');
       listen();
       return;
@@ -2400,7 +2322,7 @@ const OfflineVoice = (() => {
       el('voice-hint').textContent = '点麦克风继续收音';
     } else {
       startVoice();
-      setFeedback('看着题目，直接说出答案');
+      setFeedback('看着题目，只说数字');
     }
   });
 
@@ -2410,7 +2332,7 @@ const OfflineVoice = (() => {
     wantListen = true;
     paused = false;
     el('voice-actions').hidden = true;
-    el('voice-hint').textContent = '说完答案会自动进入下一题，点麦克风可暂停';
+    el('voice-hint').textContent = '只说数字，识别后自动进入下一题；点麦克风可暂停';
     setVoiceState('listening');
     listen();
   });

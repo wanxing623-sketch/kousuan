@@ -210,6 +210,13 @@ async function testNative(browser, base) {
   await fixQuestion(page);
   await page.click('#start-button');
   await page.evaluate(() => {
+    const result = Object.assign([{ transcript: '答案是八十三' }], { isFinal: true });
+    window.nativeMic.onresult({ resultIndex: 0, results: [result] });
+  });
+  assert.equal(await page.textContent('#score-label'), '答对 0 题');
+  assert.equal(await page.textContent('#heard-text'), '');
+  assert.match(await page.textContent('#feedback'), /只识别数字/);
+  await page.evaluate(() => {
     const result = Object.assign([{ transcript: '八十三' }], { isFinal: true });
     window.nativeMic.onresult({ resultIndex: 0, results: [result] });
   });
