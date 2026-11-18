@@ -206,7 +206,9 @@ const OfflineVoice = (() => {
         if (c !== capture) return;
         c.source = c.ctx.createMediaStreamSource(c.stream);
         // ScriptProcessor 同时覆盖没有 AudioWorklet 的移动 Safari；输出缓冲区保持静音。
-        c.node = c.ctx.createScriptProcessor(4096, 1, 1);
+        // Smaller audio blocks reduce input latency on phones without creating the
+        // very high callback overhead of 512-sample blocks.
+        c.node = c.ctx.createScriptProcessor(2048, 1, 1);
         c.node.onaudioprocess = event => {
           if (c !== capture || !decoder) return;
           try { decoder.acceptWaveform(event.inputBuffer); } catch (_) { events.error('offline-engine'); }

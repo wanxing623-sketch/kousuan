@@ -334,7 +334,7 @@
     nextQuestion();
 
     if (prefs.mode === 'voice') startVoice();
-    else el('answer').focus(); // 保持在开始按钮的手势内，手机可直接弹出数字键盘
+    else if (finePointer) el('answer').focus(); // 手机使用页面内数字键盘，避免系统键盘遮挡题目
   }
 
   function applyModeLayout() {
@@ -457,6 +457,22 @@
   el('answer-form').addEventListener('submit', (event) => {
     event.preventDefault();
     submitTyped();
+  });
+
+  el('number-pad').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-key]');
+    if (!button) return;
+    if (locked) {
+      advanceNow();
+      return;
+    }
+    const input = el('answer');
+    const key = button.dataset.key;
+    if (key === 'clear') input.value = '';
+    else if (key === 'backspace') input.value = input.value.slice(0, -1);
+    else if (/^\d$/.test(key) && input.value.length < 4) input.value += key;
+    if (key !== 'clear' && key !== 'backspace') setFeedback('');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
   });
 
   document.addEventListener('keydown', (event) => {

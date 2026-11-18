@@ -74,8 +74,11 @@ async function testOffline(browser, base) {
   await page.click('#skip-pack');
   await fixQuestion(page);
   await page.click('#start-button');
-  await page.fill('#answer', '83');
-  await page.press('#answer', 'Enter');
+  assert.equal(await page.locator('#answer').getAttribute('inputmode'), 'none');
+  await page.click('#number-pad [data-key="8"]');
+  await page.click('#number-pad [data-key="3"]');
+  assert.equal(await page.inputValue('#answer'), '83');
+  await page.click('#answer-form button[type="submit"]');
   await page.click('#quit-button');
   assert.equal(await page.textContent('#result-accuracy'), '100%');
   assert.equal(await page.evaluate(() => window.micCalls), 0);
