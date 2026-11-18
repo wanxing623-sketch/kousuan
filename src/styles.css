@@ -932,27 +932,37 @@ body { background: #f5f6f3; }
   .number-pad button { transition: none; }
 }
 
-/* ---------- Bubble number hunt ---------- */
+/* ---------- Bubble number hunt: soft mineral color, paper grain, ambient light ---------- */
 .mode-grid .bubble-mode-card { grid-column: 1 / -1; }
-.bubble-mode-icon { background: #eaf3ef; color: #487969; }
-.bubble-mark { font-size: 20px; line-height: 1; text-shadow: 7px -5px 0 #9bcfc0, -5px 6px 0 #bddda9; }
-.mode-card[data-mode="bubble"].selected { border-color: #548b78; background: #f2f8f5; }
-.mode-card[data-mode="bubble"].selected .radio-dot { border-color: #548b78; }
+.bubble-mode-icon { background: #edf1eb; color: #70836f; }
+.bubble-mark { font-size: 20px; line-height: 1; color: #82937e; text-shadow: 7px -5px 0 #bac7b4, -5px 6px 0 #d7c8bc; }
+.mode-card[data-mode="bubble"].selected { border-color: #728b73; background: #f4f7f1; }
+.mode-card[data-mode="bubble"].selected .radio-dot { border-color: #728b73; }
 .bubble-game { margin-top: 14px; }
-.bubble-instructions { margin: 0 0 10px; color: #65766c; font-size: 13px; }
+.bubble-instructions { margin: 0 0 12px; color: #6f786e; font-size: 13px; }
 .bubble-field {
   position: relative;
   width: 100%;
   height: clamp(280px, 44vh, 390px);
   overflow: hidden;
   isolation: isolate;
-  border: 1px solid #e1eae4;
-  border-radius: 22px;
-  background-color: #f3f7f4;
-  background-image: radial-gradient(#cadbd0 1px, transparent 1px), radial-gradient(#dce8e0 1px, transparent 1px);
-  background-position: 0 0, 12px 12px;
-  background-size: 24px 24px;
-  touch-action: none;
+  border: 1px solid #e4e7df;
+  border-radius: 20px;
+  background:
+    radial-gradient(ellipse at 12% 18%, rgba(212,222,207,.55), transparent 43%),
+    radial-gradient(ellipse at 86% 78%, rgba(221,214,199,.42), transparent 42%),
+    #f1f2ec;
+  touch-action: manipulation;
+}
+.bubble-field::before {
+  position: absolute;
+  inset: -18%;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(255,255,255,.62), transparent 68%);
+  content: '';
+  filter: blur(22px);
+  pointer-events: none;
 }
 .number-bubble {
   position: absolute;
@@ -962,51 +972,52 @@ body { background: #f5f6f3; }
   display: grid;
   place-items: center;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, .85);
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.72);
   border-radius: 50%;
-  color: #193a39;
-  font-weight: 750;
+  color: #344237;
+  font-weight: 650;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, .55);
-  box-shadow: inset 0 4px 13px rgba(255,255,255,.68), inset 0 -7px 14px rgba(31,75,67,.11), 0 5px 12px rgba(40,80,66,.15);
-  cursor: grab;
+  box-shadow: 0 7px 15px rgba(47,54,44,.11), inset 0 0 0 1px rgba(82,91,73,.08);
+  cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
-  touch-action: none;
+  touch-action: manipulation;
   will-change: transform;
-  transition: box-shadow .15s ease, filter .15s ease;
+  transition: box-shadow .18s ease, scale .18s ease;
 }
 .number-bubble::before {
   position: absolute;
-  top: 17%;
-  left: 21%;
-  width: 23%;
-  height: 12%;
-  border-radius: 50%;
-  background: rgba(255,255,255,.62);
+  inset: 0;
+  border-radius: inherit;
+  background-image: radial-gradient(rgba(62,72,57,.11) .55px, transparent .8px);
+  background-size: 6px 6px;
   content: '';
-  transform: rotate(-28deg);
+  opacity: .28;
+  pointer-events: none;
 }
-.number-bubble[data-tone="mint"] { background: radial-gradient(circle at 30% 24%, #d9f8ee 0, #a9e6d4 38%, #65c5b4 100%); }
-.number-bubble[data-tone="sky"] { background: radial-gradient(circle at 30% 24%, #e1f3ff 0, #b7ddf4 38%, #72b7dc 100%); }
-.number-bubble[data-tone="peach"] { background: radial-gradient(circle at 30% 24%, #fff0d9 0, #ffd3a7 38%, #f1a66e 100%); }
-.number-bubble[data-tone="lilac"] { background: radial-gradient(circle at 30% 24%, #f0eaff 0, #d3c4f5 38%, #a28bdc 100%); }
-.number-bubble[data-tone="lemon"] { background: radial-gradient(circle at 30% 24%, #fff8d6 0, #f7e6a4 38%, #e8c966 100%); }
-.number-bubble[data-tone="coral"] { background: radial-gradient(circle at 30% 24%, #ffe5e2 0, #f7c0ba 38%, #e88b94 100%); }
-.number-bubble:hover { filter: saturate(1.06); box-shadow: inset 0 4px 13px rgba(255,255,255,.7), 0 7px 17px rgba(40,80,66,.2); }
-.number-bubble.is-dragging { z-index: 5; cursor: grabbing; scale: 1.08; box-shadow: 0 12px 24px rgba(35,72,60,.25); }
-.number-bubble.is-correct { z-index: 4; outline: 4px solid rgba(64,145,103,.45); outline-offset: 2px; }
-.number-bubble.is-wrong { animation: bubble-wrong .35s ease; filter: saturate(.65); }
+.number-bubble[data-tone="sage"] { background-color: #d2dbce; }
+.number-bubble[data-tone="blue"] { background-color: #d2dcdd; }
+.number-bubble[data-tone="sand"] { background-color: #e2d8c5; }
+.number-bubble[data-tone="rose"] { background-color: #e1d2ce; }
+.number-bubble[data-tone="moss"] { background-color: #d9ddc8; }
+.number-bubble[data-tone="plum"] { background-color: #dbd5de; }
+.number-bubble:hover { box-shadow: 0 9px 19px rgba(47,54,44,.16), inset 0 0 0 1px rgba(82,91,73,.1); }
+.number-bubble:active { scale: .95; }
+.number-bubble.is-correct { z-index: 4; outline: 3px solid rgba(83,126,87,.42); outline-offset: 3px; animation: bubble-found .36s ease-out; }
+.number-bubble.is-wrong { z-index: 4; animation: bubble-dissolve .32s ease-in forwards; pointer-events: none; }
 #practice[data-mode="bubble"] .question-area { padding-bottom: 18px; }
 #practice[data-mode="bubble"] .question { margin-bottom: 10px; }
-@keyframes bubble-wrong {
-  25% { margin-left: -5px; }
-  75% { margin-left: 5px; }
+@keyframes bubble-found {
+  50% { scale: 1.13; box-shadow: 0 0 0 9px rgba(83,126,87,.15), 0 9px 19px rgba(47,54,44,.14); }
+}
+@keyframes bubble-dissolve {
+  to { scale: .68; opacity: 0; filter: blur(3px); box-shadow: 0 0 0 12px rgba(180,139,118,0); }
 }
 @media (max-width: 620px) {
-  .bubble-field { height: clamp(270px, 43vh, 350px); border-radius: 18px; }
-  .number-bubble { box-shadow: inset 0 4px 11px rgba(255,255,255,.68), inset 0 -6px 12px rgba(31,75,67,.1), 0 4px 9px rgba(40,80,66,.13); }
+  .bubble-field { height: clamp(270px, 43vh, 350px); border-radius: 17px; }
+  .number-bubble { box-shadow: 0 5px 12px rgba(47,54,44,.1), inset 0 0 0 1px rgba(82,91,73,.08); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .number-bubble.is-wrong { animation: none; }
+  .number-bubble, .number-bubble.is-wrong, .number-bubble.is-correct { transition: none; animation: none; }
 }

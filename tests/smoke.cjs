@@ -91,22 +91,25 @@ async function testOffline(browser, base) {
   await page.click('#start-button');
   await page.waitForSelector('#bubble-field button');
   assert.equal(await page.locator('#bubble-field button').count(), 9);
-  const wrongValue = await page.locator('#bubble-field button').evaluateAll(nodes => nodes.find(node => node.textContent !== '83').textContent);
-  const wrongBubble = page.getByRole('button', { name: `数字 ${wrongValue}` });
-  await wrongBubble.scrollIntoViewIfNeeded();
-  const wrongBox = await wrongBubble.boundingBox();
-  await page.mouse.move(wrongBox.x + wrongBox.width / 2, wrongBox.y + wrongBox.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(wrongBox.x + wrongBox.width / 2 + 22, wrongBox.y + wrongBox.height / 2 + 18, { steps: 4 });
-  await page.mouse.up();
-  assert.equal(await page.textContent('#score-label'), '答对 0 题');
-  await wrongBubble.click({ force: true });
+  await page.locator('#bubble-field').scrollIntoViewIfNeeded();
+  const positionsBefore = await page.locator('#bubble-field .number-bubble').evaluateAll(nodes => nodes.map(node => {
+    const r = node.getBoundingClientRect(); return [r.x, r.y];
+  }));
+  await page.waitForTimeout(600);
+  const positionsAfter = await page.locator('#bubble-field .number-bubble').evaluateAll(nodes => nodes.map(node => {
+    const r = node.getBoundingClientRect(); return [r.x, r.y];
+  }));
+  assert(positionsBefore.some((p, i) => Math.hypot(p[0] - positionsAfter[i][0], p[1] - positionsAfter[i][1]) > 4), 'bubbles move without user input');
+  const wrongValue = await page.locator('#bubble-field .number-bubble').evaluateAll(nodes => nodes.find(node => node.textContent !== '83').textContent);
+  await page.getByRole('button', { name: `数字 ${wrongValue}` }).click({ force: true });
   assert.match(await page.textContent('#feedback'), /再找找/);
+  await page.waitForFunction(() => document.querySelectorAll('#bubble-field .number-bubble').length === 8);
+  assert.equal(await page.textContent('#score-label'), '答对 0 题');
   await page.getByRole('button', { name: '数字 83' }).click({ force: true });
   assert.equal(await page.textContent('#score-label'), '答对 1 题');
   await page.click('#quit-button');
   assert.equal(await page.textContent('#result-accuracy'), '100%');
-  console.log('✓ bubble mode: draggable number balls, wrong pick stays on question, correct pick advances');
+  console.log('✓ bubble mode: autonomous motion, wrong bubbles disappear, correct pick advances');
 
   await page.click('#settings-button');
   await page.click('[data-mode="voice"]'); // no native API: offers install instead of disabling voice

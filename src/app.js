@@ -384,8 +384,14 @@
     ).innerHTML = `${question.a} <span>${question.op}</span> ${question.b} <span>=</span> ?`;
   }
 
-  const BUBBLE_PALETTE = ['mint', 'sky', 'peach', 'lilac', 'lemon', 'coral'];
+  const BUBBLE_PALETTE = ['sage', 'blue', 'sand', 'rose', 'moss', 'plum'];
   const BUBBLE_STEP = 1000 / 60;
+
+  function bubbleVelocity() {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = .58 + Math.random() * .48;
+    return { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed };
+  }
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
@@ -399,7 +405,7 @@
 
   function stopBubbles() {
     if (bubbleGame && bubbleGame.frame) cancelAnimationFrame(bubbleGame.frame);
-    if (bubbleGame && bubbleGame.wrongTimer) clearTimeout(bubbleGame.wrongTimer);
+    if (bubbleGame) bubbleGame.bubbles.forEach(ball => { if (ball.removeTimer) clearTimeout(ball.removeTimer); });
     if (bubbleGame && bubbleGame.engine) window.Matter.Engine.clear(bubbleGame.engine);
     bubbleGame = null;
     const field = el('bubble-field');
@@ -424,20 +430,24 @@
   }
 
   function chooseBubble(value, node) {
-    if (locked || view !== 'practice' || prefs.mode !== 'bubble' || !session) return;
+    if (locked || view !== 'practice' || prefs.mode !== 'bubble' || !session || node.classList.contains('is-disappearing')) return;
     if (value === session.current.answer) {
       node.classList.add('is-correct');
       submit(value);
       return;
     }
     setFeedback('不是这个数字，再找找看', 'bad');
-    node.classList.remove('is-wrong');
-    void node.offsetWidth;
-    node.classList.add('is-wrong');
-    if (bubbleGame) {
-      clearTimeout(bubbleGame.wrongTimer);
-      bubbleGame.wrongTimer = setTimeout(() => node.classList.remove('is-wrong'), 520);
-    }
+    node.classList.add('is-wrong', 'is-disappearing');
+    const game = bubbleGame;
+    const ball = game && game.bubbles.find(item => item.node === node);
+    if (!ball) { setTimeout(() => node.remove(), 320); return; }
+    ball.removeTimer = setTimeout(() => {
+      if (bubbleGame !== game) return;
+      window.Matter.Composite.remove(game.engine.world, ball.body);
+      const index = game.bubbles.indexOf(ball);
+      if (index !== -1) game.bubbles.splice(index, 1);
+      node.remove();
+    }, 320);
   }
 
   function resetBubbleWalls(game, width, height) {
@@ -479,7 +489,7 @@
     engine.gravity.y = 0;
     engine.positionIterations = 5;
     engine.velocityIterations = 4;
-    const game = bubbleGame = { field, bubbles: [], width, height, frame: 0, lastFrame: 0, accumulator: 0, wrongTimer: 0, engine, walls: [] };
+    const game = bubbleGame = { field, bubbles: [], width, height, frame: 0, lastFrame: 0, accumulator: 0, engine, walls: [] };
     resetBubbleWalls(game, width, height);
     options.forEach((value, i) => {
       const slot = slots[i];
@@ -505,89 +515,21 @@
         radius: size / 2,
         x: clamp(col * cellWidth + (cellWidth - size) / 2 + randomInt(-7, 7), 0, width - size),
         y: clamp(row * cellHeight + (cellHeight - size) / 2 + randomInt(-7, 7), 0, height - size),
-        dragging: false,
-        moved: false,
-        prevX: 0,
-        prevY: 0,
-        prevAt: 0,
-        startX: 0,
-        startY: 0,
-        grabX: 0,
-        grabY: 0,
+        nextSteerAt: performance.now() + randomInt(900, 1700),
       };
       ball.body = Matter.Bodies.circle(ball.x + ball.radius, ball.y + ball.radius, ball.radius, {
-        restitution: .9,
-        friction: .002,
-        frictionAir: .012,
+        restitution: .84,
+        friction: .006,
+        frictionAir: .0015,
         density: .001,
         slop: .02,
       });
       Matter.Composite.add(engine.world, ball.body);
-      if (!reducedMotion) Matter.Body.setVelocity(ball.body, { x: randomInt(-12, 12) / 10, y: randomInt(-12, 12) / 10 });
+      if (!reducedMotion) Matter.Body.setVelocity(ball.body, bubbleVelocity());
       game.bubbles.push(ball);
       setBubblePosition(ball);
 
-      node.addEventListener('pointerdown', event => {
-        if (locked || !bubbleGame) return;
-        event.preventDefault();
-        node.setPointerCapture(event.pointerId);
-        ball.dragging = true;
-        ball.moved = false;
-        Matter.Body.setStatic(ball.body, true);
-        const rect = field.getBoundingClientRect();
-        ball.grabX = event.clientX - rect.left - ball.x;
-        ball.grabY = event.clientY - rect.top - ball.y;
-        ball.prevX = event.clientX;
-        ball.prevY = event.clientY;
-        ball.startX = event.clientX;
-        ball.startY = event.clientY;
-        ball.prevAt = performance.now();
-        node.classList.add('is-dragging');
-        if (!reducedMotion && !game.frame) startBubbleAnimation();
-      });
-      node.addEventListener('pointermove', event => {
-        if (!ball.dragging || !bubbleGame) return;
-        const rect = field.getBoundingClientRect();
-        game.width = field.clientWidth;
-        game.height = field.clientHeight;
-        const dx = event.clientX - ball.prevX;
-        const dy = event.clientY - ball.prevY;
-        if (Math.hypot(event.clientX - ball.startX, event.clientY - ball.startY) > 6) ball.moved = true;
-        ball.x = clamp(event.clientX - rect.left - ball.grabX, 0, game.width - ball.size);
-        ball.y = clamp(event.clientY - rect.top - ball.grabY, 0, game.height - ball.size);
-        const now = performance.now();
-        const dt = Math.max(8, now - ball.prevAt);
-        ball.dragVx = clamp(dx / dt * 16.67, -10, 10);
-        ball.dragVy = clamp(dy / dt * 16.67, -10, 10);
-        Matter.Body.setPosition(ball.body, { x: ball.x + ball.radius, y: ball.y + ball.radius });
-        ball.prevX = event.clientX;
-        ball.prevY = event.clientY;
-        ball.prevAt = now;
-        setBubblePosition(ball);
-      });
-      node.addEventListener('pointerup', event => {
-        if (!ball.dragging) return;
-        ball.dragging = false;
-        node.classList.remove('is-dragging');
-        Matter.Body.setStatic(ball.body, false);
-        if (reducedMotion) Matter.Body.setVelocity(ball.body, { x: 0, y: 0 });
-        else Matter.Body.setVelocity(ball.body, { x: ball.dragVx || 0, y: ball.dragVy || 0 });
-        try { node.releasePointerCapture(event.pointerId); } catch (_) { /* 已自动释放 */ }
-        if (ball.moved) {
-          if (!reducedMotion && !game.frame) startBubbleAnimation();
-        } else {
-          chooseBubble(ball.value, node);
-        }
-      });
-      node.addEventListener('pointercancel', () => {
-        ball.dragging = false;
-        node.classList.remove('is-dragging');
-        Matter.Body.setStatic(ball.body, false);
-        Matter.Body.setVelocity(ball.body, { x: 0, y: 0 });
-      });
-      node.addEventListener('click', event => {
-        if (!window.PointerEvent || event.detail === 0) chooseBubble(ball.value, node);
-      });
+      node.addEventListener('click', () => chooseBubble(ball.value, node));
     });
 
     if (!reducedMotion) startBubbleAnimation();
@@ -612,6 +554,14 @@
         window.Matter.Engine.update(game.engine, BUBBLE_STEP);
         game.accumulator -= BUBBLE_STEP;
       }
+      game.bubbles.forEach(ball => {
+        if (now < ball.nextSteerAt) return;
+        const velocity = ball.body.velocity;
+        const angle = Math.atan2(velocity.y, velocity.x) + (Math.random() - .5) * .6;
+        const speed = clamp(Math.hypot(velocity.x, velocity.y) + (Math.random() - .5) * .12, .58, 1.06);
+        window.Matter.Body.setVelocity(ball.body, { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed });
+        ball.nextSteerAt = now + randomInt(1100, 2200);
+      });
       game.bubbles.forEach(setBubblePosition);
       game.frame = requestAnimationFrame(tick);
     };
