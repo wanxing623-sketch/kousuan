@@ -15,7 +15,10 @@ concurrency:
 jobs:
   smoke:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 12
+    env:
+      # Must match tests/package-lock.json: includes both engines and WebKit's system libraries.
+      PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.56.1-noble
     steps:
       - uses: actions/checkout@v5
         with:
@@ -28,12 +31,16 @@ jobs:
           python3 build.py
           git diff --exit-code -- index.html
           python3 build.py --site
-      - name: Install test browsers
+      - name: Prepare pinned test environment
         working-directory: tests
         run: |
-          npm ci
-          npx playwright install --with-deps chromium webkit
+          npm ci --no-audit --no-fund
+          docker pull "$PLAYWRIGHT_IMAGE"
       - name: Chromium · offline answers and fallbacks
-        run: node tests/smoke.cjs chromium
+        run: >-
+          docker run --rm --init --network none --shm-size=1g -e GITHUB_ACTIONS
+          -v "$PWD:/site:ro" -w /site "$PLAYWRIGHT_IMAGE" node tests/smoke.cjs chromium
       - name: WebKit · offline answer after browser restart
-        run: node tests/smoke.cjs webkit
+        run: >-
+          docker run --rm --init --network none --shm-size=1g -e GITHUB_ACTIONS
+          -v "$PWD:/site:ro" -w /site "$PLAYWRIGHT_IMAGE" node tests/smoke.cjs webkit
