@@ -1,0 +1,37 @@
+name: Offline voice checks
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: voice-checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify tracked page and build Pages layout
+        run: |
+          python3 build.py
+          git diff --exit-code -- index.html
+          python3 build.py --site
+      - name: Install test browsers
+        working-directory: tests
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium webkit
+      - name: Chromium · offline answers and fallbacks
+        run: node tests/smoke.cjs chromium
+      - name: WebKit · offline answer after browser restart
+        run: node tests/smoke.cjs webkit

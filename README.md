@@ -54,8 +54,11 @@ GitHub Pages 推荐将 **Settings → Pages → Source** 设为 **GitHub Actions
 ```sh
 cd tests
 npm ci
-npx playwright install chromium         # Linux 缺系统库时可加 --with-deps
-npm test
+npx playwright install chromium webkit  # Linux 缺系统库时可加 --with-deps
+npm test                                # Chromium 全流程
+npm test -- webkit                      # WebKit 浏览器进程重启后的第一次离线作答
 ```
 
 需要 Python 3.8+、Node 18+；也可用 `CHROMIUM_PATH` 指定现有 Chromium。测试在临时的 Pages 风格子路径运行，覆盖跳过下载打字、坏包校验、取消和重试、缓存缺失、拒绝麦克风及释放、原生语音降级。实测链路用合成的「八十三」WAV 作为浏览器测试麦克风：**禁用原生语音 → 下载 → 断网重新打开 → 首次载入真实 WASM/模型 → 识别并判分 → 下一题**。没有向线上语音服务发请求。
+
+PR 的 `Offline voice checks` 只运行构建与测试，不部署网站。Chromium 和 WebKit 都会用持久化浏览器配置安装语音包，然后关闭浏览器进程、停掉测试站点的 HTTP 响应、用同一配置重开，验证第一次启动模型即可把 WAV 输入判为 83。此项验证的是浏览器引擎和离线路径，不代替 iPhone / Android 真机的系统授权与收音测试。

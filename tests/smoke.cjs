@@ -5,7 +5,10 @@ const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
 const { gunzipSync } = require('node:zlib');
-const { chromium } = require('playwright');
+const { chromium, webkit } = require('playwright');
+const testReopen = require('./reopen.cjs');
+const browserType = { chromium, webkit }[process.argv[2] || 'chromium'];
+if (!browserType) throw new Error('Choose chromium or webkit');
 const files = require('../src/voice-pack.json');
 const dist = path.resolve(__dirname, '../dist');
 const [engine, model] = files.map(f => 'voice-assets/' + f.file);
@@ -210,17 +213,24 @@ async function testNative(browser, base) {
 (async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kousuan-'));
   const wav = path.join(tmp, '83.wav');
-  // Synthetic “八十三”, generated with text2wav/eSpeak NG (zh, speed 135); no personal recording.
+  // Synthetic “八，十，三”, generated with text2wav/eSpeak NG (zh, speed 130, pitch 60).
+  // Short syllable breaks keep the fixture intelligible across device sample rates; no personal recording.
   fs.writeFileSync(wav, gunzipSync(fs.readFileSync(path.join(__dirname, 'fixtures/mandarin-83.wav.gz'))));
   let browser;
   try {
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     const base = `http://localhost:${server.address().port}/kousuan/`;
-    browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined,
-      args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--use-file-for-fake-audio-capture=' + wav] });
-    await testOffline(browser, base);
-    await testNative(browser, base);
-    await testStorage(browser, base);
+    if (browserType === chromium) {
+      browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined,
+        args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--use-file-for-fake-audio-capture=' + wav] });
+      await testOffline(browser, base);
+      await testNative(browser, base);
+      await testStorage(browser, base);
+      await browser.close();
+      browser = null;
+    }
+    await testReopen({ browserType, profile: path.join(tmp, 'profile'), base, wav, fixQuestion,
+      disconnect: value => { disconnected = value; } });
   } finally {
     if (browser) await browser.close();
     server.closeAllConnections();
