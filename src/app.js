@@ -8,7 +8,7 @@
    * 对不上就带参数重新取一次页面。
    * ------------------------------------------------------------------ */
 
-  const REQUIRED_IDS = ['welcome', 'pack-button', 'setup', 'practice', 'results', 'answer-form', 'question', 'voice-button'];
+  const REQUIRED_IDS = ['welcome', 'pack-button', 'setup', 'practice', 'results', 'answer-form', 'question', 'voice-button', 'bubble-area', 'bubble-field'];
   const domMatches = REQUIRED_IDS.every((id) => document.getElementById(id));
   if (!domMatches) {
     if (location.search.indexOf('fresh=') === -1) {
@@ -57,6 +57,7 @@
   let session = null;
   let locked = false;
   let advanceTimer = 0;
+  let bubbleGame = null;
   let awayMs = 0;
   let awaySince = 0;
 
@@ -75,7 +76,7 @@
     /* 无痕模式或数据损坏：用默认值 */
   }
 
-  if (['type', 'voice'].indexOf(prefs.mode) === -1) prefs.mode = defaults.mode;
+  if (['type', 'voice', 'bubble'].indexOf(prefs.mode) === -1) prefs.mode = defaults.mode;
   if (['two', 'mixed', 'three'].indexOf(prefs.level) === -1) prefs.level = defaults.level;
   if ([0, 10, 20, 30].indexOf(prefs.count) === -1) prefs.count = defaults.count;
 
@@ -311,6 +312,7 @@
    * ------------------------------------------------------------------ */
 
   function startSession() {
+    stopBubbles();
     if (prefs.mode === 'voice' && !offlineReady && (prefs.voiceEngine === 'offline' || !supportsSpeech)) {
       showView('welcome');
       return;
@@ -339,8 +341,12 @@
 
   function applyModeLayout() {
     const isVoice = prefs.mode === 'voice';
-    el('answer-form').hidden = isVoice;
+    const isBubble = prefs.mode === 'bubble';
+    el('answer-form').hidden = isVoice || isBubble;
+    el('keypad-hint').hidden = isVoice || isBubble;
+    el('number-pad').hidden = isVoice || isBubble;
     el('voice-area').hidden = !isVoice;
+    el('bubble-area').hidden = !isBubble;
     el('practice').dataset.mode = prefs.mode;
   }
 
@@ -357,12 +363,15 @@
 
     renderQuestion();
     el('answer').value = '';
-    setFeedback(prefs.mode === 'voice' ? '看着题目，只说数字' : '仔细想一想，输入你的答案');
+    setFeedback(prefs.mode === 'voice' ? '看着题目，只说数字'
+      : prefs.mode === 'bubble' ? '点击正确的数字球通过这一题' : '仔细想一想，输入你的答案');
     el('question').classList.remove('shake');
     updateMeta();
 
     if (prefs.mode === 'voice') {
       resumeVoice();
+    } else if (prefs.mode === 'bubble') {
+      renderBubbles();
     } else if (finePointer) {
       el('answer').focus();
     }
@@ -373,6 +382,240 @@
     el(
       'question'
     ).innerHTML = `${question.a} <span>${question.op}</span> ${question.b} <span>=</span> ?`;
+  }
+
+  const BUBBLE_PALETTE = ['mint', 'sky', 'peach', 'lilac', 'lemon', 'coral'];
+  const BUBBLE_STEP = 1000 / 60;
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+  function setBubblePosition(ball) {
+    if (ball.body) {
+      ball.x = ball.body.position.x - ball.radius;
+      ball.y = ball.body.position.y - ball.radius;
+    }
+    ball.node.style.transform = `translate3d(${Math.round(ball.x)}px, ${Math.round(ball.y)}px, 0)`;
+  }
+
+  function stopBubbles() {
+    if (bubbleGame && bubbleGame.frame) cancelAnimationFrame(bubbleGame.frame);
+    if (bubbleGame && bubbleGame.wrongTimer) clearTimeout(bubbleGame.wrongTimer);
+    if (bubbleGame && bubbleGame.engine) window.Matter.Engine.clear(bubbleGame.engine);
+    bubbleGame = null;
+    const field = el('bubble-field');
+    if (field) while (field.firstChild) field.removeChild(field.firstChild);
+  }
+
+  function bubbleAnswerOptions(answer) {
+    const maximum = prefs.level === 'two' ? 198 : prefs.level === 'mixed' ? 1098 : 1998;
+    const values = new Set([answer]);
+    const spread = prefs.level === 'two' ? 42 : 88;
+    for (let tries = 0; values.size < 9 && tries < 200; tries += 1) {
+      const candidate = clamp(answer + randomInt(-spread, spread), 0, maximum);
+      if (candidate !== answer) values.add(candidate);
+    }
+    while (values.size < 9) values.add(randomInt(0, maximum));
+    const options = Array.from(values);
+    for (let i = options.length - 1; i > 0; i -= 1) {
+      const j = randomInt(0, i);
+      [options[i], options[j]] = [options[j], options[i]];
+    }
+    return options;
+  }
+
+  function chooseBubble(value, node) {
+    if (locked || view !== 'practice' || prefs.mode !== 'bubble' || !session) return;
+    if (value === session.current.answer) {
+      node.classList.add('is-correct');
+      submit(value);
+      return;
+    }
+    setFeedback('不是这个数字，再找找看', 'bad');
+    node.classList.remove('is-wrong');
+    void node.offsetWidth;
+    node.classList.add('is-wrong');
+    if (bubbleGame) {
+      clearTimeout(bubbleGame.wrongTimer);
+      bubbleGame.wrongTimer = setTimeout(() => node.classList.remove('is-wrong'), 520);
+    }
+  }
+
+  function resetBubbleWalls(game, width, height) {
+    const Matter = window.Matter;
+    game.walls.forEach(wall => Matter.Composite.remove(game.engine.world, wall));
+    const thickness = 100;
+    game.walls = [
+      Matter.Bodies.rectangle(width / 2, -thickness / 2, width + thickness * 2, thickness, { isStatic: true, restitution: .9 }),
+      Matter.Bodies.rectangle(width / 2, height + thickness / 2, width + thickness * 2, thickness, { isStatic: true, restitution: .9 }),
+      Matter.Bodies.rectangle(-thickness / 2, height / 2, thickness, height + thickness * 2, { isStatic: true, restitution: .9 }),
+      Matter.Bodies.rectangle(width + thickness / 2, height / 2, thickness, height + thickness * 2, { isStatic: true, restitution: .9 }),
+    ];
+    Matter.Composite.add(game.engine.world, game.walls);
+    game.width = width;
+    game.height = height;
+  }
+
+  function renderBubbles() {
+    stopBubbles();
+    const field = el('bubble-field');
+    const width = field.clientWidth;
+    const height = field.clientHeight;
+    if (!width || !height || !session) return;
+
+    const options = bubbleAnswerOptions(session.current.answer);
+    const columns = 3;
+    const rows = Math.ceil(options.length / columns);
+    const cellWidth = width / columns;
+    const cellHeight = height / rows;
+    const slots = options.map((_, i) => i);
+    for (let i = slots.length - 1; i > 0; i -= 1) {
+      const j = randomInt(0, i);
+      [slots[i], slots[j]] = [slots[j], slots[i]];
+    }
+
+    const Matter = window.Matter;
+    const engine = Matter.Engine.create({ enableSleeping: false });
+    engine.gravity.x = 0;
+    engine.gravity.y = 0;
+    engine.positionIterations = 5;
+    engine.velocityIterations = 4;
+    const game = bubbleGame = { field, bubbles: [], width, height, frame: 0, lastFrame: 0, accumulator: 0, wrongTimer: 0, engine, walls: [] };
+    resetBubbleWalls(game, width, height);
+    options.forEach((value, i) => {
+      const slot = slots[i];
+      const col = slot % columns;
+      const row = Math.floor(slot / columns);
+      const size = Math.max(58, Math.min(randomInt(70, 86), cellWidth - 8, cellHeight - 8));
+      const node = document.createElement('button');
+      node.type = 'button';
+      node.className = 'number-bubble';
+      node.dataset.value = String(value);
+      node.dataset.tone = BUBBLE_PALETTE[randomInt(0, BUBBLE_PALETTE.length - 1)];
+      node.setAttribute('aria-label', `数字 ${value}`);
+      node.textContent = String(value);
+      node.style.width = `${size}px`;
+      node.style.height = `${size}px`;
+      node.style.fontSize = size < 68 ? '18px' : size < 78 ? '20px' : '22px';
+      field.appendChild(node);
+
+      const ball = {
+        node,
+        value,
+        size,
+        radius: size / 2,
+        x: clamp(col * cellWidth + (cellWidth - size) / 2 + randomInt(-7, 7), 0, width - size),
+        y: clamp(row * cellHeight + (cellHeight - size) / 2 + randomInt(-7, 7), 0, height - size),
+        dragging: false,
+        moved: false,
+        prevX: 0,
+        prevY: 0,
+        prevAt: 0,
+        startX: 0,
+        startY: 0,
+        grabX: 0,
+        grabY: 0,
+      };
+      ball.body = Matter.Bodies.circle(ball.x + ball.radius, ball.y + ball.radius, ball.radius, {
+        restitution: .9,
+        friction: .002,
+        frictionAir: .012,
+        density: .001,
+        slop: .02,
+      });
+      Matter.Composite.add(engine.world, ball.body);
+      if (!reducedMotion) Matter.Body.setVelocity(ball.body, { x: randomInt(-12, 12) / 10, y: randomInt(-12, 12) / 10 });
+      game.bubbles.push(ball);
+      setBubblePosition(ball);
+
+      node.addEventListener('pointerdown', event => {
+        if (locked || !bubbleGame) return;
+        event.preventDefault();
+        node.setPointerCapture(event.pointerId);
+        ball.dragging = true;
+        ball.moved = false;
+        Matter.Body.setStatic(ball.body, true);
+        const rect = field.getBoundingClientRect();
+        ball.grabX = event.clientX - rect.left - ball.x;
+        ball.grabY = event.clientY - rect.top - ball.y;
+        ball.prevX = event.clientX;
+        ball.prevY = event.clientY;
+        ball.startX = event.clientX;
+        ball.startY = event.clientY;
+        ball.prevAt = performance.now();
+        node.classList.add('is-dragging');
+        if (!reducedMotion && !game.frame) startBubbleAnimation();
+      });
+      node.addEventListener('pointermove', event => {
+        if (!ball.dragging || !bubbleGame) return;
+        const rect = field.getBoundingClientRect();
+        game.width = field.clientWidth;
+        game.height = field.clientHeight;
+        const dx = event.clientX - ball.prevX;
+        const dy = event.clientY - ball.prevY;
+        if (Math.hypot(event.clientX - ball.startX, event.clientY - ball.startY) > 6) ball.moved = true;
+        ball.x = clamp(event.clientX - rect.left - ball.grabX, 0, game.width - ball.size);
+        ball.y = clamp(event.clientY - rect.top - ball.grabY, 0, game.height - ball.size);
+        const now = performance.now();
+        const dt = Math.max(8, now - ball.prevAt);
+        ball.dragVx = clamp(dx / dt * 16.67, -10, 10);
+        ball.dragVy = clamp(dy / dt * 16.67, -10, 10);
+        Matter.Body.setPosition(ball.body, { x: ball.x + ball.radius, y: ball.y + ball.radius });
+        ball.prevX = event.clientX;
+        ball.prevY = event.clientY;
+        ball.prevAt = now;
+        setBubblePosition(ball);
+      });
+      node.addEventListener('pointerup', event => {
+        if (!ball.dragging) return;
+        ball.dragging = false;
+        node.classList.remove('is-dragging');
+        Matter.Body.setStatic(ball.body, false);
+        if (reducedMotion) Matter.Body.setVelocity(ball.body, { x: 0, y: 0 });
+        else Matter.Body.setVelocity(ball.body, { x: ball.dragVx || 0, y: ball.dragVy || 0 });
+        try { node.releasePointerCapture(event.pointerId); } catch (_) { /* 已自动释放 */ }
+        if (ball.moved) {
+          if (!reducedMotion && !game.frame) startBubbleAnimation();
+        } else {
+          chooseBubble(ball.value, node);
+        }
+      });
+      node.addEventListener('pointercancel', () => {
+        ball.dragging = false;
+        node.classList.remove('is-dragging');
+        Matter.Body.setStatic(ball.body, false);
+        Matter.Body.setVelocity(ball.body, { x: 0, y: 0 });
+      });
+      node.addEventListener('click', event => {
+        if (!window.PointerEvent || event.detail === 0) chooseBubble(ball.value, node);
+      });
+    });
+
+    if (!reducedMotion) startBubbleAnimation();
+  }
+
+  function startBubbleAnimation() {
+    if (!bubbleGame || bubbleGame.frame || reducedMotion || document.hidden) return;
+    const tick = now => {
+      const game = bubbleGame;
+      if (!game || document.hidden || view !== 'practice' || prefs.mode !== 'bubble') {
+        if (game) game.frame = 0;
+        return;
+      }
+      const rect = game.field.getBoundingClientRect();
+      if (Math.abs(rect.width - game.width) > 1 || Math.abs(rect.height - game.height) > 1) {
+        resetBubbleWalls(game, rect.width, rect.height);
+      }
+      const delta = game.lastFrame ? Math.min(now - game.lastFrame, 50) : BUBBLE_STEP;
+      game.lastFrame = now;
+      game.accumulator += delta;
+      while (game.accumulator >= BUBBLE_STEP) {
+        window.Matter.Engine.update(game.engine, BUBBLE_STEP);
+        game.accumulator -= BUBBLE_STEP;
+      }
+      game.bubbles.forEach(setBubblePosition);
+      game.frame = requestAnimationFrame(tick);
+    };
+    bubbleGame.frame = requestAnimationFrame(tick);
   }
 
   function updateMeta() {
@@ -565,6 +808,7 @@
   }
 
   function showView(next) {
+    if (next !== 'practice') stopBubbles();
     view = next;
     el('welcome').hidden = next !== 'welcome';
     el('view-label').textContent = { welcome: '练习准备', setup: '练习设置', practice: '练习中', results: '练习结果' }[next];
@@ -927,6 +1171,10 @@
 
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
+      if (bubbleGame && bubbleGame.frame) {
+        cancelAnimationFrame(bubbleGame.frame);
+        bubbleGame.frame = 0;
+      }
       if (view === 'practice') awaySince = performance.now();
       if (recognition && offlineReady && wantListen && !micProblem) {
         // iOS 从后台回来时通常需要新的用户手势才能解锁 AudioContext。
@@ -946,11 +1194,13 @@
       paused = false;
       listen();
     }
+    if (view === 'practice' && prefs.mode === 'bubble') startBubbleAnimation();
   });
 
   window.addEventListener('pagehide', () => {
     if (download) download.abort();
     stopVoice();
+    stopBubbles();
   });
 
   syncSetup();
