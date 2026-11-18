@@ -21,44 +21,16 @@
         <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M7 11h10m-5-5v10M18 20h8m-8 5h8"/></svg></span>
         <span>速算练习</span>
       </a>
-      <span class="brand-caption" lang="en">MATH LAB</span>
       <span class="view-tag"><span aria-hidden="true"></span><span id="view-label">练习准备</span></span>
     </header>
 
     <section id="welcome" aria-labelledby="welcome-title">
       <div class="welcome-hero">
         <div class="hero-copy">
-          <p class="eyebrow"><span></span>口算训练室 <b aria-hidden="true">/</b> <span lang="en">QUICK MATH</span></p>
-          <h1 id="welcome-title" tabindex="-1">让答案，<br><em>脱口而出。</em></h1>
-          <p class="hero-lead">看题、心算，说出答案。下载普通话语音包，<br class="wide-only">不联网也能在手机上练口算。</p>
+          <p class="eyebrow"><span></span>每天练一会儿</p>
+          <h1 id="welcome-title" tabindex="-1">把口算，<br><em>练得更熟。</em></h1>
+          <p class="hero-lead">选好题目开始练习。可以用数字键输入，也可以安装语音包后直接作答。</p>
         </div>
-        <svg class="hero-art" viewBox="0 0 400 264" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="paper-grid" width="19" height="19" patternUnits="userSpaceOnUse"><path d="M19 0H0V19" fill="none" stroke="#bdcfc0" stroke-width="1"/></pattern>
-            <clipPath id="board-clip"><rect width="400" height="264" rx="20"/></clipPath>
-          </defs>
-          <g clip-path="url(#board-clip)">
-            <g class="art-paper"><rect width="400" height="264" fill="#dfebdc"/><rect width="400" height="264" fill="url(#paper-grid)"/></g>
-            <g fill="none" stroke="#88a792" stroke-width="1.6" stroke-linecap="round"><path d="M24 23h11m-5.5-5.5v11m336 207h11m-5.5-5.5v11"/><path d="M29 207q-2 13 12 11t5-10q-4-3-6 4t12 15"/></g>
-            <g transform="rotate(6 195 124)"><rect x="84" y="50" width="231" height="149" rx="12" fill="#a6b9a9"/><rect x="84" y="45" width="231" height="149" rx="12" fill="#bad0bd" stroke="#78987e"/></g>
-            <g transform="rotate(-9 183 121)">
-              <rect x="58" y="48" width="241" height="152" rx="12" fill="#91a993" opacity=".5"/>
-              <rect x="58" y="43" width="241" height="152" rx="12" fill="#fffdf6" stroke="#40584d" stroke-width="1.8"/>
-              <g font-family="system-ui,sans-serif" font-weight="700" font-size="9" letter-spacing="1.5" fill="#526b60"><text x="74" y="68">MATH CARD</text><text x="258" y="68">01</text></g>
-              <path d="M74 79h208" fill="none" stroke="#d8dfd2" stroke-dasharray="4 4"/>
-              <text x="77" y="140" fill="#263c34" font-family="system-ui,sans-serif" font-size="48" font-weight="750" letter-spacing="-2">47 <tspan fill="#d96741">+</tspan> 36</text>
-              <g fill="#c4d1c2"><rect x="74" y="166" width="41" height="4" rx="2"/><circle cx="123" cy="168" r="2"/></g>
-            </g>
-            <path d="m314 49 5 10 10 5-10 4-5 11-4-11-10-4 10-5z" fill="#ffcc78" stroke="#40584d" stroke-width="1.6"/>
-            <path d="m329 36 2 5 6 2-6 2-2 6-2-6-5-2 5-2z" fill="#40584d"/>
-            <g transform="rotate(5 268 194)">
-              <path d="M209 170h117a14 14 0 0 1 14 14v26a14 14 0 0 1-14 14h-88l-17 12 2-12h-14a14 14 0 0 1-14-14v-26a14 14 0 0 1 14-14z" fill="#90a694" opacity=".5"/>
-              <path d="M207 165h117a14 14 0 0 1 14 14v26a14 14 0 0 1-14 14h-88l-17 12 2-12h-14a14 14 0 0 1-14-14v-26a14 14 0 0 1 14-14z" fill="#ffb991" stroke="#40584d" stroke-width="1.8"/>
-              <g stroke="#543e31" stroke-width="3" stroke-linecap="round"><path d="M211 189v6m6-14v22m6-17v12m6-22v32m6-23v14m6-11v8"/></g>
-              <text x="252" y="200" fill="#443b2f" font-family="system-ui,sans-serif" font-size="21" font-weight="700">八十三</text>
-            </g>
-          </g>
-        </svg>
       </div>
 
       <div class="pack-card" id="pack-card" data-state="checking">
@@ -153,9 +125,24 @@
 
         <form id="answer-form" autocomplete="off" novalidate>
           <label class="sr-only" for="answer">输入答案</label>
-          <input id="answer" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="输入答案" autocomplete="off" enterkeyhint="done">
-          <button class="submit-button" type="submit">确认答案 <span aria-hidden="true">↗</span></button>
+          <input id="answer" type="text" inputmode="none" pattern="[0-9]*" maxlength="4" placeholder="输入答案" autocomplete="off" enterkeyhint="done" aria-describedby="keypad-hint">
+          <button class="submit-button" type="submit">确认</button>
         </form>
+        <p id="keypad-hint" class="keypad-hint">可点按下方数字键，也可使用实体键盘</p>
+        <div id="number-pad" class="number-pad" role="group" aria-label="数字键盘">
+          <button type="button" data-key="1" aria-label="1">1</button>
+          <button type="button" data-key="2" aria-label="2">2</button>
+          <button type="button" data-key="3" aria-label="3">3</button>
+          <button type="button" data-key="4" aria-label="4">4</button>
+          <button type="button" data-key="5" aria-label="5">5</button>
+          <button type="button" data-key="6" aria-label="6">6</button>
+          <button type="button" data-key="7" aria-label="7">7</button>
+          <button type="button" data-key="8" aria-label="8">8</button>
+          <button type="button" data-key="9" aria-label="9">9</button>
+          <button type="button" data-key="clear" class="utility-key" aria-label="清空">清空</button>
+          <button type="button" data-key="0" aria-label="0">0</button>
+          <button type="button" data-key="backspace" class="utility-key" aria-label="删除一位">⌫</button>
+        </div>
 
         <div id="voice-area" class="voice-area" hidden>
           <p id="voice-engine" class="engine-label"></p>

@@ -778,6 +778,174 @@ input:focus-visible {
   .question { font-size: 34px; }
   .result-stats { margin: 18px 0 12px; }
 }
+
+/* ---------- Mobile-first refresh: calm surfaces, clear hierarchy, generous targets ---------- */
+:root {
+  --ink: #202d27;
+  --ink-soft: #46564d;
+  --muted: #68756e;
+  --muted-2: #89938d;
+  --orange: #b85a37;
+  --orange-dark: #944326;
+  --orange-wash: #f8eee8;
+  --lavender: #edf2ee;
+  --lavender-ink: #355b48;
+  --line: #dfe5df;
+  --line-soft: #e9ede9;
+  --green: #28744b;
+  --red: #b34835;
+  --radius: 16px;
+  background: #f5f6f3;
+  color: var(--ink);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-synthesis: none;
+  text-rendering: auto;
+}
+
+body { background: #f5f6f3; }
+.app-shell { max-width: 800px; padding-top: 20px; }
+.topbar { min-height: 48px; padding-bottom: 12px; border-color: #dfe4de; }
+.brand { font-size: 18px; font-weight: 700; letter-spacing: 0; }
+.brand-mark { width: 32px; height: 32px; margin-right: 9px; border-radius: 9px; background: #315b45; transform: none; }
+.brand-mark svg { width: 24px; height: 24px; }
+.brand-caption, .eyebrow b, .eyebrow span[lang] { display: none; }
+.view-tag { padding: 5px 10px; background: #e9eee8; color: #385743; font-size: 12px; letter-spacing: 0; }
+.view-tag > span:first-child { width: 7px; height: 7px; }
+
+.welcome-hero { grid-template-columns: 1fr; padding: 34px 0 26px; }
+.hero-art { display: none; }
+.eyebrow { color: #66766b; font-family: inherit; font-size: 13px; font-weight: 600; letter-spacing: 0; }
+.eyebrow > span:first-child { width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: #528265; }
+.hero-copy h1 { margin: 12px 0 10px; font-size: clamp(34px, 7vw, 48px); font-weight: 750; line-height: 1.22; letter-spacing: -.04em; }
+.hero-copy h1 em { color: #315b45; }
+.hero-lead { max-width: 540px; color: #647168; font-size: 15px; line-height: 1.75; }
+.pack-card { padding: 18px 20px 14px; border-color: #e0e5df; border-radius: 14px; background: #fff; box-shadow: none; }
+.pack-heading { padding-bottom: 12px; border-bottom-style: solid; border-color: #edf0ec; }
+.section-number { display: none; }
+.pack-heading h2 { font-size: 16px; font-weight: 650; }
+.pack-state { padding: 4px 9px; border: 0; background: #f1f3ef; font-size: 11px; }
+.pack-body { padding: 16px 0 10px; }
+.pack-icon { width: 44px; height: 44px; border-radius: 12px; background: #edf3ed; }
+.pack-copy h3 { font-size: 15px; font-weight: 650; }
+.pack-copy p, .pack-message { font-size: 12px; }
+.pack-body .pack-button { min-height: 44px; padding: 0 15px; border-radius: 9px; font-size: 13px; }
+.welcome-foot { padding: 8px 2px; }
+.privacy-note { font-size: 12px; }
+.skip-button { color: #3a6149; font-size: 13px; }
+
+.panel { max-width: 600px; margin-top: 22px; border: 1px solid #e1e6e0; border-radius: 16px; background: #fff; box-shadow: 0 5px 18px rgba(35, 53, 41, .035); }
+.setup-panel { padding: 24px 26px 22px; }
+.setup-heading { margin-bottom: 22px; }
+.setup-heading h1 { font-size: 22px; font-weight: 700; }
+.setting-group { margin-bottom: 22px; }
+.setting-group legend { margin-bottom: 10px; font-size: 14px; font-weight: 650; }
+.mode-grid { gap: 10px; }
+.mode-card { min-height: 68px; border-color: #e1e6e0; border-radius: 12px; }
+.mode-card.selected, .difficulty-card.selected { border-color: #477558; background: #f5f8f4; box-shadow: none; }
+.mode-icon { background: #f6eee9; color: #9c5034; }
+.mode-icon.voice-icon { background: #eef3ef; color: #426b50; }
+.mode-copy strong { font-size: 13px; }
+.mode-copy small { color: #727e75; font-size: 11px; }
+.mode-card.selected .mode-copy small { color: #617266; }
+.mode-card.selected .radio-dot { border-color: #477558; }
+.difficulty-grid { gap: 8px; }
+.difficulty-card { min-height: 82px; border-color: #e1e6e0; border-radius: 11px; }
+.equation-preview { font-size: 17px; }
+.equation-preview i { color: #a75133; }
+.difficulty-card strong { color: #66736a; font-size: 11px; }
+.quantity-options { gap: 8px; }
+.quantity-option { min-height: 46px; border-color: #e1e6e0; border-radius: 10px; }
+.quantity-option.selected { border-color: #477558; background: #f5f8f4; color: #315b45; }
+.quantity-option.selected small { color: #315b45; }
+.primary-button { min-height: 50px; border-radius: 11px; background: #315b45; box-shadow: none; font-size: 15px; }
+.primary-button:hover { background: #244a37; box-shadow: none; }
+.setup-panel > .primary-button { margin-top: 2px; }
+
+.practice-panel { max-width: 510px; padding: 18px 24px 22px; }
+.practice-topline { min-height: 42px; }
+.text-button, .quit-button { font-size: 13px; }
+.quit-button { color: #78837c; font-size: 12px; }
+.progress-row { margin-top: 20px; color: #67746b; font-size: 12px; }
+.progress-track { height: 6px; margin-top: 8px; background: #edf0ed; }
+.progress-track span { background: #4e805b; }
+.question-area { padding: 36px 8px 12px; }
+.question-kicker { color: #77837a; font-size: 13px; }
+.question { margin: 12px 0 8px; color: #1f3027; font-size: clamp(42px, 9vw, 62px); font-weight: 650; letter-spacing: .01em; }
+.question span { padding: 0 7px; color: #a55235; }
+.feedback { min-height: 24px; color: #718077; font-size: 13px; }
+.feedback.good { color: #28744b; }
+.feedback.bad { color: #b34835; }
+#answer-form { max-width: 350px; margin-top: 20px; gap: 8px; }
+#answer { height: 52px; border-color: #dce4dc; border-radius: 11px; font-size: 21px; }
+#answer::placeholder { color: #9aa49d; font-size: 14px; }
+#answer:focus { border-color: #548066; box-shadow: 0 0 0 3px rgba(61, 110, 76, .12); }
+.submit-button { min-width: 76px; height: 52px; margin-left: 0; border-radius: 10px; background: #315b45; font-size: 14px; }
+.submit-button:hover { background: #244a37; }
+.keypad-hint { margin: 10px 0 8px; color: #7a867e; font-size: 12px; }
+.number-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: min(100%, 340px); margin: 0 auto; }
+.number-pad button { min-height: 56px; border: 1px solid #e1e7e1; border-radius: 11px; background: #f8faf8; color: #24372b; font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; transition: background-color .12s ease, border-color .12s ease, transform .12s ease; touch-action: manipulation; }
+.number-pad button:active { transform: scale(.97); background: #edf3ed; }
+.number-pad button.utility-key { background: #f1f4f1; color: #53665a; font-size: 14px; font-weight: 600; }
+#practice[data-mode="voice"] #answer-form,
+#practice[data-mode="voice"] .keypad-hint,
+#practice[data-mode="voice"] .number-pad { display: none; }
+.voice-area { margin-top: 20px; }
+.engine-label { color: #77837a; font-size: 12px; }
+.voice-button { min-height: 52px; padding: 0 24px; border-radius: 99px; background: #edf3ee; color: #315b45; font-size: 14px; }
+.voice-button.is-listening { background: #f4eee8; color: #994a2f; }
+.heard-text { color: #994a2f; }
+.voice-hint { color: #7a867e; font-size: 12px; }
+.mini-button { min-height: 46px; border-color: #dfe6df; border-radius: 10px; }
+.results-panel { padding: 30px 26px 24px; }
+.result-icon { background: #eef3ee; color: #477558; }
+.results-panel h2 { font-size: 24px; }
+.result-stats { background: #f6f8f6; }
+.result-stats span { font-size: 11px; }
+
+@media (max-width: 620px) {
+  .app-shell { width: calc(100% - 32px); padding-top: calc(12px + env(safe-area-inset-top)); padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+  .topbar { padding-bottom: 10px; }
+  .brand { font-size: 17px; }
+  .welcome-hero { padding: 28px 0 22px; }
+  .hero-copy h1 { margin: 10px 0 8px; font-size: clamp(32px, 9vw, 40px); letter-spacing: -.035em; }
+  .hero-copy h1 br { display: none; }
+  .hero-lead { font-size: 14px; line-height: 1.65; }
+  .pack-card { padding: 16px 15px 12px; }
+  .pack-body { flex-wrap: wrap; }
+  .pack-copy { margin: 0 8px 0 10px; }
+  .pack-copy h3 { font-size: 14px; }
+  .pack-body .pack-button { width: 100%; margin: 14px 0 0; }
+  .welcome-foot { align-items: flex-start; gap: 8px; }
+  .privacy-note { font-size: 11px; }
+  .skip-button { padding: 0 2px; font-size: 12px; }
+  .panel { margin-top: 14px; }
+  .setup-panel { padding: 20px 16px 16px; }
+  .setup-heading { margin-bottom: 18px; }
+  .mode-grid { grid-template-columns: 1fr; }
+  .mode-card { min-height: 64px; }
+  .difficulty-grid { gap: 6px; }
+  .difficulty-card { min-height: 78px; padding-right: 4px; padding-left: 4px; }
+  .equation-preview { font-size: 15px; }
+  .difficulty-card strong { font-size: 10px; }
+  .quantity-options { gap: 6px; }
+  .practice-panel { padding: 14px 14px 18px; }
+  .progress-row { margin-top: 14px; }
+  .question-area { padding: 27px 0 8px; }
+  .question { font-size: clamp(40px, 12vw, 54px); }
+  #answer-form { max-width: 360px; }
+  .number-pad { width: min(100%, 360px); gap: 8px; }
+  .number-pad button { min-height: 58px; }
+  .results-panel { padding: 26px 18px 20px; }
+}
+@media (max-width: 360px) {
+  .app-shell { width: calc(100% - 24px); }
+  .practice-panel { padding-right: 12px; padding-left: 12px; }
+  .number-pad { gap: 6px; }
+  .number-pad button { min-height: 52px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .number-pad button { transition: none; }
+}
   </style>
 </head>
 <body>
@@ -787,44 +955,16 @@ input:focus-visible {
         <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M7 11h10m-5-5v10M18 20h8m-8 5h8"/></svg></span>
         <span>速算练习</span>
       </a>
-      <span class="brand-caption" lang="en">MATH LAB</span>
       <span class="view-tag"><span aria-hidden="true"></span><span id="view-label">练习准备</span></span>
     </header>
 
     <section id="welcome" aria-labelledby="welcome-title">
       <div class="welcome-hero">
         <div class="hero-copy">
-          <p class="eyebrow"><span></span>口算训练室 <b aria-hidden="true">/</b> <span lang="en">QUICK MATH</span></p>
-          <h1 id="welcome-title" tabindex="-1">让答案，<br><em>脱口而出。</em></h1>
-          <p class="hero-lead">看题、心算，说出答案。下载普通话语音包，<br class="wide-only">不联网也能在手机上练口算。</p>
+          <p class="eyebrow"><span></span>每天练一会儿</p>
+          <h1 id="welcome-title" tabindex="-1">把口算，<br><em>练得更熟。</em></h1>
+          <p class="hero-lead">选好题目开始练习。可以用数字键输入，也可以安装语音包后直接作答。</p>
         </div>
-        <svg class="hero-art" viewBox="0 0 400 264" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="paper-grid" width="19" height="19" patternUnits="userSpaceOnUse"><path d="M19 0H0V19" fill="none" stroke="#bdcfc0" stroke-width="1"/></pattern>
-            <clipPath id="board-clip"><rect width="400" height="264" rx="20"/></clipPath>
-          </defs>
-          <g clip-path="url(#board-clip)">
-            <g class="art-paper"><rect width="400" height="264" fill="#dfebdc"/><rect width="400" height="264" fill="url(#paper-grid)"/></g>
-            <g fill="none" stroke="#88a792" stroke-width="1.6" stroke-linecap="round"><path d="M24 23h11m-5.5-5.5v11m336 207h11m-5.5-5.5v11"/><path d="M29 207q-2 13 12 11t5-10q-4-3-6 4t12 15"/></g>
-            <g transform="rotate(6 195 124)"><rect x="84" y="50" width="231" height="149" rx="12" fill="#a6b9a9"/><rect x="84" y="45" width="231" height="149" rx="12" fill="#bad0bd" stroke="#78987e"/></g>
-            <g transform="rotate(-9 183 121)">
-              <rect x="58" y="48" width="241" height="152" rx="12" fill="#91a993" opacity=".5"/>
-              <rect x="58" y="43" width="241" height="152" rx="12" fill="#fffdf6" stroke="#40584d" stroke-width="1.8"/>
-              <g font-family="system-ui,sans-serif" font-weight="700" font-size="9" letter-spacing="1.5" fill="#526b60"><text x="74" y="68">MATH CARD</text><text x="258" y="68">01</text></g>
-              <path d="M74 79h208" fill="none" stroke="#d8dfd2" stroke-dasharray="4 4"/>
-              <text x="77" y="140" fill="#263c34" font-family="system-ui,sans-serif" font-size="48" font-weight="750" letter-spacing="-2">47 <tspan fill="#d96741">+</tspan> 36</text>
-              <g fill="#c4d1c2"><rect x="74" y="166" width="41" height="4" rx="2"/><circle cx="123" cy="168" r="2"/></g>
-            </g>
-            <path d="m314 49 5 10 10 5-10 4-5 11-4-11-10-4 10-5z" fill="#ffcc78" stroke="#40584d" stroke-width="1.6"/>
-            <path d="m329 36 2 5 6 2-6 2-2 6-2-6-5-2 5-2z" fill="#40584d"/>
-            <g transform="rotate(5 268 194)">
-              <path d="M209 170h117a14 14 0 0 1 14 14v26a14 14 0 0 1-14 14h-88l-17 12 2-12h-14a14 14 0 0 1-14-14v-26a14 14 0 0 1 14-14z" fill="#90a694" opacity=".5"/>
-              <path d="M207 165h117a14 14 0 0 1 14 14v26a14 14 0 0 1-14 14h-88l-17 12 2-12h-14a14 14 0 0 1-14-14v-26a14 14 0 0 1 14-14z" fill="#ffb991" stroke="#40584d" stroke-width="1.8"/>
-              <g stroke="#543e31" stroke-width="3" stroke-linecap="round"><path d="M211 189v6m6-14v22m6-17v12m6-22v32m6-23v14m6-11v8"/></g>
-              <text x="252" y="200" fill="#443b2f" font-family="system-ui,sans-serif" font-size="21" font-weight="700">八十三</text>
-            </g>
-          </g>
-        </svg>
       </div>
 
       <div class="pack-card" id="pack-card" data-state="checking">
@@ -919,9 +1059,24 @@ input:focus-visible {
 
         <form id="answer-form" autocomplete="off" novalidate>
           <label class="sr-only" for="answer">输入答案</label>
-          <input id="answer" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="输入答案" autocomplete="off" enterkeyhint="done">
-          <button class="submit-button" type="submit">确认答案 <span aria-hidden="true">↗</span></button>
+          <input id="answer" type="text" inputmode="none" pattern="[0-9]*" maxlength="4" placeholder="输入答案" autocomplete="off" enterkeyhint="done" aria-describedby="keypad-hint">
+          <button class="submit-button" type="submit">确认</button>
         </form>
+        <p id="keypad-hint" class="keypad-hint">可点按下方数字键，也可使用实体键盘</p>
+        <div id="number-pad" class="number-pad" role="group" aria-label="数字键盘">
+          <button type="button" data-key="1" aria-label="1">1</button>
+          <button type="button" data-key="2" aria-label="2">2</button>
+          <button type="button" data-key="3" aria-label="3">3</button>
+          <button type="button" data-key="4" aria-label="4">4</button>
+          <button type="button" data-key="5" aria-label="5">5</button>
+          <button type="button" data-key="6" aria-label="6">6</button>
+          <button type="button" data-key="7" aria-label="7">7</button>
+          <button type="button" data-key="8" aria-label="8">8</button>
+          <button type="button" data-key="9" aria-label="9">9</button>
+          <button type="button" data-key="clear" class="utility-key" aria-label="清空">清空</button>
+          <button type="button" data-key="0" aria-label="0">0</button>
+          <button type="button" data-key="backspace" class="utility-key" aria-label="删除一位">⌫</button>
+        </div>
 
         <div id="voice-area" class="voice-area" hidden>
           <p id="voice-engine" class="engine-label"></p>
@@ -1236,7 +1391,9 @@ const OfflineVoice = (() => {
         if (c !== capture) return;
         c.source = c.ctx.createMediaStreamSource(c.stream);
         // ScriptProcessor 同时覆盖没有 AudioWorklet 的移动 Safari；输出缓冲区保持静音。
-        c.node = c.ctx.createScriptProcessor(4096, 1, 1);
+        // Smaller audio blocks reduce input latency on phones without creating the
+        // very high callback overhead of 512-sample blocks.
+        c.node = c.ctx.createScriptProcessor(2048, 1, 1);
         c.node.onaudioprocess = event => {
           if (c !== capture || !decoder) return;
           try { decoder.acceptWaveform(event.inputBuffer); } catch (_) { events.error('offline-engine'); }
@@ -1603,7 +1760,7 @@ const OfflineVoice = (() => {
     nextQuestion();
 
     if (prefs.mode === 'voice') startVoice();
-    else el('answer').focus(); // 保持在开始按钮的手势内，手机可直接弹出数字键盘
+    else if (finePointer) el('answer').focus(); // 手机使用页面内数字键盘，避免系统键盘遮挡题目
   }
 
   function applyModeLayout() {
@@ -1726,6 +1883,22 @@ const OfflineVoice = (() => {
   el('answer-form').addEventListener('submit', (event) => {
     event.preventDefault();
     submitTyped();
+  });
+
+  el('number-pad').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-key]');
+    if (!button) return;
+    if (locked) {
+      advanceNow();
+      return;
+    }
+    const input = el('answer');
+    const key = button.dataset.key;
+    if (key === 'clear') input.value = '';
+    else if (key === 'backspace') input.value = input.value.slice(0, -1);
+    else if (/^\d$/.test(key) && input.value.length < 4) input.value += key;
+    if (key !== 'clear' && key !== 'backspace') setFeedback('');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
   });
 
   document.addEventListener('keydown', (event) => {
