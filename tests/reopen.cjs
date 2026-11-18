@@ -8,6 +8,25 @@ async function waitForPack(page, expected) {
   assert.equal(await page.getAttribute('#pack-card', 'data-state'), expected, await page.textContent('#pack-message'));
 }
 
+// Diagnostics only, after an assertion failed. The neutral in-memory page is outside
+// the app scope; it can inspect this profile even if the app document failed to load.
+async function cacheReport(ctx, base) {
+  const p = await ctx.newPage();
+  try {
+    const url = new URL('/__test_cache_state', base).href;
+    await p.route(url, route => route.fulfill({ contentType: 'text/html', body: '<title>cache diagnostics</title>' }));
+    await p.goto(url, { timeout: 5000 });
+    return await p.evaluate(async () => {
+      const report = {};
+      for (const name of await caches.keys()) {
+        const cache = await caches.open(name);
+        report[name] = (await cache.keys()).map(key => new URL(key.url).pathname);
+      }
+      return JSON.stringify(report);
+    });
+  } finally { await p.close(); }
+}
+
 module.exports = async function testReopen({ browserType, profile, base, wav, fixQuestion, disconnect }) {
   const options = { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true };
   if (browserType.name() === 'chromium') options.executablePath = process.env.CHROMIUM_PATH;
@@ -32,6 +51,7 @@ module.exports = async function testReopen({ browserType, profile, base, wav, fi
     await waitForPack(page, 'idle');
     await page.click('#pack-button');
     await waitForPack(page, 'ready');
+    assert(await page.evaluate(async () => (await (await caches.match(new URL('index.html', document.baseURI))).text()).includes('kousuanReady')), 'The offline HTML must be readable before closing');
     assert(await page.evaluate(() => !window.Vosk), 'The decoder must not be preloaded during installation');
   } catch (err) {
     throw await explain('install', err);
@@ -75,7 +95,9 @@ module.exports = async function testReopen({ browserType, profile, base, wav, fi
     assert.equal(await page.evaluate(() => window.fixtureTrack.readyState), 'ended');
     console.log(`✓ ${browserType.name()} persistent profile: install → close browser → reopen offline → real WAV → 83 → score`);
   } catch (err) {
-    throw await explain('offline reopen', err);
+    const reason = await explain('offline reopen', err);
+    reason.message += '\nStored after restart: ' + await cacheReport(ctx, base).catch(e => e.message);
+    throw reason;
   } finally {
     await ctx.close();
     disconnect(false);
