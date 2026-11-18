@@ -947,27 +947,37 @@ body { background: #f5f6f3; }
   .number-pad button { transition: none; }
 }
 
-/* ---------- Bubble number hunt ---------- */
+/* ---------- Bubble number hunt: soft mineral color, paper grain, ambient light ---------- */
 .mode-grid .bubble-mode-card { grid-column: 1 / -1; }
-.bubble-mode-icon { background: #eaf3ef; color: #487969; }
-.bubble-mark { font-size: 20px; line-height: 1; text-shadow: 7px -5px 0 #9bcfc0, -5px 6px 0 #bddda9; }
-.mode-card[data-mode="bubble"].selected { border-color: #548b78; background: #f2f8f5; }
-.mode-card[data-mode="bubble"].selected .radio-dot { border-color: #548b78; }
+.bubble-mode-icon { background: #edf1eb; color: #70836f; }
+.bubble-mark { font-size: 20px; line-height: 1; color: #82937e; text-shadow: 7px -5px 0 #bac7b4, -5px 6px 0 #d7c8bc; }
+.mode-card[data-mode="bubble"].selected { border-color: #728b73; background: #f4f7f1; }
+.mode-card[data-mode="bubble"].selected .radio-dot { border-color: #728b73; }
 .bubble-game { margin-top: 14px; }
-.bubble-instructions { margin: 0 0 10px; color: #65766c; font-size: 13px; }
+.bubble-instructions { margin: 0 0 12px; color: #6f786e; font-size: 13px; }
 .bubble-field {
   position: relative;
   width: 100%;
   height: clamp(280px, 44vh, 390px);
   overflow: hidden;
   isolation: isolate;
-  border: 1px solid #e1eae4;
-  border-radius: 22px;
-  background-color: #f3f7f4;
-  background-image: radial-gradient(#cadbd0 1px, transparent 1px), radial-gradient(#dce8e0 1px, transparent 1px);
-  background-position: 0 0, 12px 12px;
-  background-size: 24px 24px;
-  touch-action: none;
+  border: 1px solid #e4e7df;
+  border-radius: 20px;
+  background:
+    radial-gradient(ellipse at 12% 18%, rgba(212,222,207,.55), transparent 43%),
+    radial-gradient(ellipse at 86% 78%, rgba(221,214,199,.42), transparent 42%),
+    #f1f2ec;
+  touch-action: manipulation;
+}
+.bubble-field::before {
+  position: absolute;
+  inset: -18%;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(255,255,255,.62), transparent 68%);
+  content: '';
+  filter: blur(22px);
+  pointer-events: none;
 }
 .number-bubble {
   position: absolute;
@@ -977,53 +987,54 @@ body { background: #f5f6f3; }
   display: grid;
   place-items: center;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, .85);
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.72);
   border-radius: 50%;
-  color: #193a39;
-  font-weight: 750;
+  color: #344237;
+  font-weight: 650;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, .55);
-  box-shadow: inset 0 4px 13px rgba(255,255,255,.68), inset 0 -7px 14px rgba(31,75,67,.11), 0 5px 12px rgba(40,80,66,.15);
-  cursor: grab;
+  box-shadow: 0 7px 15px rgba(47,54,44,.11), inset 0 0 0 1px rgba(82,91,73,.08);
+  cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
-  touch-action: none;
+  touch-action: manipulation;
   will-change: transform;
-  transition: box-shadow .15s ease, filter .15s ease;
+  transition: box-shadow .18s ease, scale .18s ease;
 }
 .number-bubble::before {
   position: absolute;
-  top: 17%;
-  left: 21%;
-  width: 23%;
-  height: 12%;
-  border-radius: 50%;
-  background: rgba(255,255,255,.62);
+  inset: 0;
+  border-radius: inherit;
+  background-image: radial-gradient(rgba(62,72,57,.11) .55px, transparent .8px);
+  background-size: 6px 6px;
   content: '';
-  transform: rotate(-28deg);
+  opacity: .28;
+  pointer-events: none;
 }
-.number-bubble[data-tone="mint"] { background: radial-gradient(circle at 30% 24%, #d9f8ee 0, #a9e6d4 38%, #65c5b4 100%); }
-.number-bubble[data-tone="sky"] { background: radial-gradient(circle at 30% 24%, #e1f3ff 0, #b7ddf4 38%, #72b7dc 100%); }
-.number-bubble[data-tone="peach"] { background: radial-gradient(circle at 30% 24%, #fff0d9 0, #ffd3a7 38%, #f1a66e 100%); }
-.number-bubble[data-tone="lilac"] { background: radial-gradient(circle at 30% 24%, #f0eaff 0, #d3c4f5 38%, #a28bdc 100%); }
-.number-bubble[data-tone="lemon"] { background: radial-gradient(circle at 30% 24%, #fff8d6 0, #f7e6a4 38%, #e8c966 100%); }
-.number-bubble[data-tone="coral"] { background: radial-gradient(circle at 30% 24%, #ffe5e2 0, #f7c0ba 38%, #e88b94 100%); }
-.number-bubble:hover { filter: saturate(1.06); box-shadow: inset 0 4px 13px rgba(255,255,255,.7), 0 7px 17px rgba(40,80,66,.2); }
-.number-bubble.is-dragging { z-index: 5; cursor: grabbing; scale: 1.08; box-shadow: 0 12px 24px rgba(35,72,60,.25); }
-.number-bubble.is-correct { z-index: 4; outline: 4px solid rgba(64,145,103,.45); outline-offset: 2px; }
-.number-bubble.is-wrong { animation: bubble-wrong .35s ease; filter: saturate(.65); }
+.number-bubble[data-tone="sage"] { background-color: #d2dbce; }
+.number-bubble[data-tone="blue"] { background-color: #d2dcdd; }
+.number-bubble[data-tone="sand"] { background-color: #e2d8c5; }
+.number-bubble[data-tone="rose"] { background-color: #e1d2ce; }
+.number-bubble[data-tone="moss"] { background-color: #d9ddc8; }
+.number-bubble[data-tone="plum"] { background-color: #dbd5de; }
+.number-bubble:hover { box-shadow: 0 9px 19px rgba(47,54,44,.16), inset 0 0 0 1px rgba(82,91,73,.1); }
+.number-bubble:active { scale: .95; }
+.number-bubble.is-correct { z-index: 4; outline: 3px solid rgba(83,126,87,.42); outline-offset: 3px; animation: bubble-found .36s ease-out; }
+.number-bubble.is-wrong { z-index: 4; animation: bubble-dissolve .32s ease-in forwards; pointer-events: none; }
 #practice[data-mode="bubble"] .question-area { padding-bottom: 18px; }
 #practice[data-mode="bubble"] .question { margin-bottom: 10px; }
-@keyframes bubble-wrong {
-  25% { margin-left: -5px; }
-  75% { margin-left: 5px; }
+@keyframes bubble-found {
+  50% { scale: 1.13; box-shadow: 0 0 0 9px rgba(83,126,87,.15), 0 9px 19px rgba(47,54,44,.14); }
+}
+@keyframes bubble-dissolve {
+  to { scale: .68; opacity: 0; filter: blur(3px); box-shadow: 0 0 0 12px rgba(180,139,118,0); }
 }
 @media (max-width: 620px) {
-  .bubble-field { height: clamp(270px, 43vh, 350px); border-radius: 18px; }
-  .number-bubble { box-shadow: inset 0 4px 11px rgba(255,255,255,.68), inset 0 -6px 12px rgba(31,75,67,.1), 0 4px 9px rgba(40,80,66,.13); }
+  .bubble-field { height: clamp(270px, 43vh, 350px); border-radius: 17px; }
+  .number-bubble { box-shadow: 0 5px 12px rgba(47,54,44,.1), inset 0 0 0 1px rgba(82,91,73,.08); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .number-bubble.is-wrong { animation: none; }
+  .number-bubble, .number-bubble.is-wrong, .number-bubble.is-correct { transition: none; animation: none; }
 }
   </style>
 </head>
@@ -1084,7 +1095,7 @@ body { background: #f5f6f3; }
           </button>
           <button class="mode-card bubble-mode-card" type="button" data-mode="bubble" aria-pressed="false">
             <span class="mode-icon bubble-mode-icon" aria-hidden="true"><span class="bubble-mark">●</span></span>
-            <span class="mode-copy"><strong>气泡寻数</strong><small>拖动数字球，点中正确答案</small></span>
+            <span class="mode-copy"><strong>气泡寻数</strong><small>数字球会自主漂浮，点中正确答案</small></span>
             <span class="radio-dot" aria-hidden="true"></span>
           </button>
         </div>
@@ -1142,7 +1153,7 @@ body { background: #f5f6f3; }
         <div id="feedback" class="feedback" role="status" aria-live="polite">仔细想一想，输入你的答案</div>
 
         <div id="bubble-area" class="bubble-game" hidden>
-          <p class="bubble-instructions">拖动数字球，找到答案后点击它</p>
+          <p class="bubble-instructions">数字球会自己移动，点中正确答案即可通过</p>
           <div id="bubble-field" class="bubble-field" role="group" aria-label="数字气泡选项"></div>
         </div>
 
@@ -1947,8 +1958,14 @@ const OfflineVoice = (() => {
     ).innerHTML = `${question.a} <span>${question.op}</span> ${question.b} <span>=</span> ?`;
   }
 
-  const BUBBLE_PALETTE = ['mint', 'sky', 'peach', 'lilac', 'lemon', 'coral'];
+  const BUBBLE_PALETTE = ['sage', 'blue', 'sand', 'rose', 'moss', 'plum'];
   const BUBBLE_STEP = 1000 / 60;
+
+  function bubbleVelocity() {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = .58 + Math.random() * .48;
+    return { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed };
+  }
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
@@ -1962,7 +1979,7 @@ const OfflineVoice = (() => {
 
   function stopBubbles() {
     if (bubbleGame && bubbleGame.frame) cancelAnimationFrame(bubbleGame.frame);
-    if (bubbleGame && bubbleGame.wrongTimer) clearTimeout(bubbleGame.wrongTimer);
+    if (bubbleGame) bubbleGame.bubbles.forEach(ball => { if (ball.removeTimer) clearTimeout(ball.removeTimer); });
     if (bubbleGame && bubbleGame.engine) window.Matter.Engine.clear(bubbleGame.engine);
     bubbleGame = null;
     const field = el('bubble-field');
@@ -1987,20 +2004,24 @@ const OfflineVoice = (() => {
   }
 
   function chooseBubble(value, node) {
-    if (locked || view !== 'practice' || prefs.mode !== 'bubble' || !session) return;
+    if (locked || view !== 'practice' || prefs.mode !== 'bubble' || !session || node.classList.contains('is-disappearing')) return;
     if (value === session.current.answer) {
       node.classList.add('is-correct');
       submit(value);
       return;
     }
     setFeedback('不是这个数字，再找找看', 'bad');
-    node.classList.remove('is-wrong');
-    void node.offsetWidth;
-    node.classList.add('is-wrong');
-    if (bubbleGame) {
-      clearTimeout(bubbleGame.wrongTimer);
-      bubbleGame.wrongTimer = setTimeout(() => node.classList.remove('is-wrong'), 520);
-    }
+    node.classList.add('is-wrong', 'is-disappearing');
+    const game = bubbleGame;
+    const ball = game && game.bubbles.find(item => item.node === node);
+    if (!ball) { setTimeout(() => node.remove(), 320); return; }
+    ball.removeTimer = setTimeout(() => {
+      if (bubbleGame !== game) return;
+      window.Matter.Composite.remove(game.engine.world, ball.body);
+      const index = game.bubbles.indexOf(ball);
+      if (index !== -1) game.bubbles.splice(index, 1);
+      node.remove();
+    }, 320);
   }
 
   function resetBubbleWalls(game, width, height) {
@@ -2042,7 +2063,7 @@ const OfflineVoice = (() => {
     engine.gravity.y = 0;
     engine.positionIterations = 5;
     engine.velocityIterations = 4;
-    const game = bubbleGame = { field, bubbles: [], width, height, frame: 0, lastFrame: 0, accumulator: 0, wrongTimer: 0, engine, walls: [] };
+    const game = bubbleGame = { field, bubbles: [], width, height, frame: 0, lastFrame: 0, accumulator: 0, engine, walls: [] };
     resetBubbleWalls(game, width, height);
     options.forEach((value, i) => {
       const slot = slots[i];
@@ -2068,89 +2089,21 @@ const OfflineVoice = (() => {
         radius: size / 2,
         x: clamp(col * cellWidth + (cellWidth - size) / 2 + randomInt(-7, 7), 0, width - size),
         y: clamp(row * cellHeight + (cellHeight - size) / 2 + randomInt(-7, 7), 0, height - size),
-        dragging: false,
-        moved: false,
-        prevX: 0,
-        prevY: 0,
-        prevAt: 0,
-        startX: 0,
-        startY: 0,
-        grabX: 0,
-        grabY: 0,
+        nextSteerAt: performance.now() + randomInt(900, 1700),
       };
       ball.body = Matter.Bodies.circle(ball.x + ball.radius, ball.y + ball.radius, ball.radius, {
-        restitution: .9,
-        friction: .002,
-        frictionAir: .012,
+        restitution: .84,
+        friction: .006,
+        frictionAir: .0015,
         density: .001,
         slop: .02,
       });
       Matter.Composite.add(engine.world, ball.body);
-      if (!reducedMotion) Matter.Body.setVelocity(ball.body, { x: randomInt(-12, 12) / 10, y: randomInt(-12, 12) / 10 });
+      if (!reducedMotion) Matter.Body.setVelocity(ball.body, bubbleVelocity());
       game.bubbles.push(ball);
       setBubblePosition(ball);
 
-      node.addEventListener('pointerdown', event => {
-        if (locked || !bubbleGame) return;
-        event.preventDefault();
-        node.setPointerCapture(event.pointerId);
-        ball.dragging = true;
-        ball.moved = false;
-        Matter.Body.setStatic(ball.body, true);
-        const rect = field.getBoundingClientRect();
-        ball.grabX = event.clientX - rect.left - ball.x;
-        ball.grabY = event.clientY - rect.top - ball.y;
-        ball.prevX = event.clientX;
-        ball.prevY = event.clientY;
-        ball.startX = event.clientX;
-        ball.startY = event.clientY;
-        ball.prevAt = performance.now();
-        node.classList.add('is-dragging');
-        if (!reducedMotion && !game.frame) startBubbleAnimation();
-      });
-      node.addEventListener('pointermove', event => {
-        if (!ball.dragging || !bubbleGame) return;
-        const rect = field.getBoundingClientRect();
-        game.width = field.clientWidth;
-        game.height = field.clientHeight;
-        const dx = event.clientX - ball.prevX;
-        const dy = event.clientY - ball.prevY;
-        if (Math.hypot(event.clientX - ball.startX, event.clientY - ball.startY) > 6) ball.moved = true;
-        ball.x = clamp(event.clientX - rect.left - ball.grabX, 0, game.width - ball.size);
-        ball.y = clamp(event.clientY - rect.top - ball.grabY, 0, game.height - ball.size);
-        const now = performance.now();
-        const dt = Math.max(8, now - ball.prevAt);
-        ball.dragVx = clamp(dx / dt * 16.67, -10, 10);
-        ball.dragVy = clamp(dy / dt * 16.67, -10, 10);
-        Matter.Body.setPosition(ball.body, { x: ball.x + ball.radius, y: ball.y + ball.radius });
-        ball.prevX = event.clientX;
-        ball.prevY = event.clientY;
-        ball.prevAt = now;
-        setBubblePosition(ball);
-      });
-      node.addEventListener('pointerup', event => {
-        if (!ball.dragging) return;
-        ball.dragging = false;
-        node.classList.remove('is-dragging');
-        Matter.Body.setStatic(ball.body, false);
-        if (reducedMotion) Matter.Body.setVelocity(ball.body, { x: 0, y: 0 });
-        else Matter.Body.setVelocity(ball.body, { x: ball.dragVx || 0, y: ball.dragVy || 0 });
-        try { node.releasePointerCapture(event.pointerId); } catch (_) { /* 已自动释放 */ }
-        if (ball.moved) {
-          if (!reducedMotion && !game.frame) startBubbleAnimation();
-        } else {
-          chooseBubble(ball.value, node);
-        }
-      });
-      node.addEventListener('pointercancel', () => {
-        ball.dragging = false;
-        node.classList.remove('is-dragging');
-        Matter.Body.setStatic(ball.body, false);
-        Matter.Body.setVelocity(ball.body, { x: 0, y: 0 });
-      });
-      node.addEventListener('click', event => {
-        if (!window.PointerEvent || event.detail === 0) chooseBubble(ball.value, node);
-      });
+      node.addEventListener('click', () => chooseBubble(ball.value, node));
     });
 
     if (!reducedMotion) startBubbleAnimation();
@@ -2175,6 +2128,14 @@ const OfflineVoice = (() => {
         window.Matter.Engine.update(game.engine, BUBBLE_STEP);
         game.accumulator -= BUBBLE_STEP;
       }
+      game.bubbles.forEach(ball => {
+        if (now < ball.nextSteerAt) return;
+        const velocity = ball.body.velocity;
+        const angle = Math.atan2(velocity.y, velocity.x) + (Math.random() - .5) * .6;
+        const speed = clamp(Math.hypot(velocity.x, velocity.y) + (Math.random() - .5) * .12, .58, 1.06);
+        window.Matter.Body.setVelocity(ball.body, { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed });
+        ball.nextSteerAt = now + randomInt(1100, 2200);
+      });
       game.bubbles.forEach(setBubblePosition);
       game.frame = requestAnimationFrame(tick);
     };
