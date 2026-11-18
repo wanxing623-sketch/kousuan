@@ -1,0 +1,55 @@
+name: Offline voice checks
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: voice-checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      # Must match tests/package-lock.json: includes both engines and WebKit's system libraries.
+      PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.56.1-noble
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Reuse verified voice assets
+        uses: actions/cache@v5
+        with:
+          path: dist/voice-assets
+          key: voice-assets-${{ hashFiles('src/voice-pack.json') }}
+      - name: Verify tracked page and build Pages layout
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 build.py
+          git diff --exit-code -- index.html sw.js
+          python3 build.py --site
+      - name: Prepare pinned test environment
+        id: browsers
+        working-directory: tests
+        run: |
+          npm ci --no-audit --no-fund
+          docker pull "$PLAYWRIGHT_IMAGE"
+      - name: Chromium · offline answers and fallbacks
+        run: >-
+          docker run --rm --init --network none --shm-size=1g -e GITHUB_ACTIONS
+          -v "$PWD:/site:ro" -w /site "$PLAYWRIGHT_IMAGE" node tests/smoke.cjs chromium
+      - name: WebKit · offline answer after browser restart
+        if: ${{ !cancelled() && steps.browsers.outcome == 'success' }}
+        run: >-
+          docker run --rm --init --network none --shm-size=1g -e GITHUB_ACTIONS
+          -v "$PWD:/site:ro" -w /site "$PLAYWRIGHT_IMAGE" node tests/smoke.cjs webkit

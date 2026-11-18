@@ -26,10 +26,19 @@ jobs:
         uses: actions/checkout@v4
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
+      - name: Reuse verified voice assets
+        uses: actions/cache@v5
+        with:
+          path: dist/voice-assets
+          key: voice-assets-${{ hashFiles('src/voice-pack.json') }}
+      - name: Build site with verified offline voice assets
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 build.py --site
       - name: Upload website files
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: dist
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4

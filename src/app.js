@@ -8,7 +8,7 @@
    * 对不上就带参数重新取一次页面。
    * ------------------------------------------------------------------ */
 
-  const REQUIRED_IDS = ['setup', 'practice', 'results', 'answer-form', 'question', 'voice-button'];
+  const REQUIRED_IDS = ['welcome', 'pack-button', 'setup', 'practice', 'results', 'answer-form', 'question', 'voice-button'];
   const domMatches = REQUIRED_IDS.every((id) => document.getElementById(id));
   if (!domMatches) {
     if (location.search.indexOf('fresh=') === -1) {
@@ -40,15 +40,20 @@
   }
 
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const supportsSpeech = Boolean(Recognition);
+  const supportsSpeech = Boolean(Recognition) && window.isSecureContext !== false;
   const inFrame = window.self !== window.top;
   const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
-  const defaults = { mode: 'type', level: 'two', count: 10 };
-  let prefs = { ...defaults };
+  const defaults = { mode: 'type', level: 'two', count: 10, welcomed: false, voiceEngine: 'browser' };
+  let prefs = Object.assign({}, defaults);
   let best = {};
 
-  let view = 'setup';
+  let view = 'welcome';
+  let packState = 'checking';
+  let download = null;
+  let offlineReady = false;
+  let packRestriction;
+  try { packRestriction = OfflineVoice.unsupported(); } catch (_) { packRestriction = '浏览器不允许保存离线资源，请在普通窗口打开。'; }
   let session = null;
   let locked = false;
   let advanceTimer = 0;
@@ -73,7 +78,6 @@
   if (['type', 'voice'].indexOf(prefs.mode) === -1) prefs.mode = defaults.mode;
   if (['two', 'mixed', 'three'].indexOf(prefs.level) === -1) prefs.level = defaults.level;
   if ([0, 10, 20, 30].indexOf(prefs.count) === -1) prefs.count = defaults.count;
-  if (!supportsSpeech) prefs.mode = 'type';
 
   function persist() {
     try {
@@ -86,6 +90,88 @@
   /* ------------------------------------------------------------------ *
    * 设置页
    * ------------------------------------------------------------------ */
+
+  const PACK_LABELS = {
+    checking: ['检查中', '正在检查'], idle: ['未下载', '下载语音包'], downloading: ['安装中', '正在下载…'],
+    ready: ['已下载', '使用离线语音 →'], error: ['未完成', '重试下载'], unsupported: ['不可用', '暂不支持'],
+  };
+  function setPackState(state, message) {
+    packState = state;
+    offlineReady = state === 'ready';
+    el('pack-card').dataset.state = state;
+    el('pack-state').textContent = PACK_LABELS[state][0];
+    el('pack-button-label').textContent = PACK_LABELS[state][1];
+    el('pack-button').disabled = ['checking', 'unsupported', 'downloading'].indexOf(state) !== -1;
+    el('skip-label').textContent = state === 'downloading' ? '取消下载，先用打字' : '跳过，先用打字';
+    el('pack-progress').hidden = state !== 'downloading';
+    el('pack-message').textContent = message;
+    el('pack-new-tab').hidden = !inFrame || (state !== 'error' && state !== 'unsupported');
+    syncSetup();
+  }
+  async function checkPack(firstVisit) {
+    setPackState('checking', '正在检查此设备上的语音包…');
+    try {
+      const ready = !packRestriction && await OfflineVoice.installed();
+      if (download) return;
+      if (packRestriction) setPackState('unsupported', packRestriction);
+      else if (ready) setPackState('ready', '语音包已保存在此设备。进入练习设置，选好题目后即可开口作答。');
+      else setPackState('idle', '建议使用 Wi-Fi，并预留 120 MB 空间。开始语音练习时再授权麦克风。');
+    } catch (_) {
+      setPackState('error', '无法读取本机缓存，请检查剩余空间，或在非无痕窗口重试。');
+    }
+    // 已选择本地识别的用户丢失缓存后，不能默默改用可能上传音频的原生服务。
+    if (!offlineReady && (!supportsSpeech || prefs.voiceEngine === 'offline')) prefs.mode = 'type';
+    syncSetup();
+    if (firstVisit && prefs.welcomed && view === 'welcome') showView('setup');
+  }
+  function enterSetup(mode) {
+    prefs.welcomed = true;
+    prefs.mode = mode;
+    if (mode === 'voice') prefs.voiceEngine = 'offline';
+    persist();
+    syncSetup();
+    showView('setup');
+  }
+  el('pack-button').addEventListener('click', async () => {
+    if (offlineReady) { enterSetup('voice'); return; }
+    if (download || packRestriction || packState === 'checking') return;
+    const job = download = new AbortController();
+    const bar = el('pack-progress');
+    bar.value = 0;
+    setPackState('downloading', '正在准备离线页面…');
+    try {
+      let lastMessage = '';
+      await OfflineVoice.install(job.signal, (bytes, verifying) => {
+        if (job !== download) return;
+        const percent = Math.floor(bytes / OfflineVoice.size * 100);
+        const message = verifying ? '正在校验并保存到本机…' : `正在下载语音包 · ${percent}%`;
+        if (message !== lastMessage) {
+          bar.value = percent;
+          el('pack-message').textContent = message;
+          lastMessage = message;
+        }
+      });
+      if (job === download) setPackState('ready', '已经准备好！进入练习设置，选择题目后再允许麦克风。');
+    } catch (error) {
+      if (job !== download) return;
+      if (job.signal.aborted) { setPackState('idle', '下载已取消，可以重新下载。'); return; }
+      const networkMessage = navigator.onLine === false ? '首次下载需要联网，请连接 Wi-Fi 后重试。' : '下载中断，请检查网络或换用 Wi-Fi 后重试。';
+      const message = error.name === 'QuotaExceededError' ? '存储空间不足，请清理一些空间后重试。'
+        : error instanceof TypeError ? networkMessage : error.message || '下载失败，请检查网络和剩余空间后重试。';
+      setPackState('error', message);
+    } finally {
+      if (job === download) download = null;
+    }
+  });
+  el('skip-pack').addEventListener('click', () => {
+    if (download) {
+      download.abort();
+      download = null;
+      setPackState('idle', '下载已取消，稍后可在这里继续。');
+    }
+    enterSetup('type');
+  });
+  el('manage-pack').addEventListener('click', () => { showView('welcome'); checkPack(false); });
 
   function syncSetup() {
     document.querySelectorAll('[data-mode]').forEach((button) => {
@@ -103,13 +189,24 @@
       setClass(button, 'selected', on);
       button.setAttribute('aria-pressed', String(on));
     });
-    el('voice-tip').hidden = !(prefs.mode === 'voice' && supportsSpeech);
+    const voiceCard = document.querySelector('[data-mode="voice"]');
+    voiceCard.disabled = !offlineReady && !supportsSpeech && Boolean(packRestriction);
+    voiceCard.querySelector('small').textContent = offlineReady ? '离线识别 · 普通话'
+      : supportsSpeech ? '浏览器识别 · 可能需要联网' : packRestriction ? '此浏览器不支持' : '先下载普通话语音包';
+    el('voice-note').hidden = !voiceCard.disabled;
+    el('voice-tip').hidden = prefs.mode !== 'voice';
+    el('voice-tip').textContent = offlineReady ? '将使用本机语音包。开始后请允许麦克风。' : '将使用浏览器语音服务，可能会联网。需要离线识别可先安装语音包。';
   }
 
   document.querySelectorAll('[data-mode]').forEach((button) => {
     button.addEventListener('click', () => {
       if (button.disabled) return;
+      if (button.dataset.mode === 'voice' && !offlineReady && !supportsSpeech) {
+        showView('welcome');
+        return;
+      }
       prefs.mode = button.dataset.mode;
+      if (prefs.mode === 'voice') prefs.voiceEngine = offlineReady ? 'offline' : 'browser';
       syncSetup();
       persist();
     });
@@ -130,16 +227,6 @@
       persist();
     });
   });
-
-  if (!supportsSpeech) {
-    const voiceCard = document.querySelector('[data-mode="voice"]');
-    if (voiceCard) {
-      voiceCard.disabled = true;
-      voiceCard.setAttribute('aria-describedby', 'voice-note');
-      voiceCard.querySelector('.mode-copy small').textContent = '此浏览器不支持';
-    }
-    el('voice-note').hidden = false;
-  }
 
   el('start-button').addEventListener('click', startSession);
   el('again-button').addEventListener('click', startSession);
@@ -224,6 +311,10 @@
    * ------------------------------------------------------------------ */
 
   function startSession() {
+    if (prefs.mode === 'voice' && !offlineReady && (prefs.voiceEngine === 'offline' || !supportsSpeech)) {
+      showView('welcome');
+      return;
+    }
     clearTimeout(advanceTimer);
     locked = false;
     awayMs = 0;
@@ -242,7 +333,8 @@
     applyModeLayout();
     nextQuestion();
 
-    if (prefs.mode === 'voice' && supportsSpeech) startVoice();
+    if (prefs.mode === 'voice') startVoice();
+    else el('answer').focus(); // 保持在开始按钮的手势内，手机可直接弹出数字键盘
   }
 
   function applyModeLayout() {
@@ -458,9 +550,12 @@
 
   function showView(next) {
     view = next;
+    el('welcome').hidden = next !== 'welcome';
+    el('view-label').textContent = { welcome: '练习准备', setup: '练习设置', practice: '练习中', results: '练习结果' }[next];
     el('setup').hidden = next !== 'setup';
     el('practice').hidden = next !== 'practice';
     el('results').hidden = next !== 'results';
+    if (next === 'welcome' || next === 'setup') el(next + '-title').focus();
     window.scrollTo(0, 0);
   }
 
@@ -638,94 +733,78 @@
   let silenceCount = 0;
 
   function createRecognition() {
-    const instance = new Recognition();
-    instance.lang = 'zh-CN';
-    instance.continuous = false;
-    instance.interimResults = true;
-    instance.maxAlternatives = 5;
-
-    instance.onstart = () => {
+    let instance;
+    const active = () => recognition === instance && wantListen && !paused && !locked && !document.hidden && view === 'practice';
+    function started() {
+      if (!active()) return;
       isListening = true;
       hasStarted = true;
       micProblem = null;
       setVoiceState('listening');
-      if (!locked) setVoiceLabel('正在聆听…');
-    };
-
-    instance.onresult = (event) => {
-      if (locked) return;
-      for (let i = event.resultIndex; i < event.results.length; i += 1) {
-        const result = event.results[i];
-        const text = (result[0].transcript || '').trim();
-        if (!text) continue;
-        silenceCount = 0;
-        el('heard-text').textContent = text;
-        if (!result.isFinal) continue;
-
-        let value = null;
-        for (let k = 0; k < result.length; k += 1) {
-          const candidate = parseSpokenNumber(result[k].transcript);
-          if (candidate !== null) {
-            value = candidate;
-            break;
-          }
-        }
-        if (value === null) value = parseSpokenNumber(text);
-
-        if (value === null) {
-          setFeedback('没听清，再说一次', 'bad');
-          continue;
-        }
-        setFeedback('');
-        submit(value);
-        break;
+    }
+    function transcript(alternatives, final) {
+      if (!active() || !alternatives.length || !alternatives[0].trim()) return;
+      silenceCount = 0;
+      const heard = alternatives[0].trim().replace(/<unk>/ig, '…');
+      if (el('heard-text').textContent !== heard) el('heard-text').textContent = heard;
+      if (!final) return;
+      for (const text of alternatives) {
+        if (/<unk>/i.test(text)) continue; // 有未听清的音节时不拿残缺的数字判分
+        const value = parseSpokenNumber(text);
+        if (value !== null) { submit(value); return; }
       }
-    };
-
-    instance.onerror = (event) => {
-      const code = event && event.error;
+      setFeedback('没听清，再说一次', 'bad');
+    }
+    function failed(code) {
+      if (!active() || code === 'aborted') return;
       if (code === 'no-speech') {
         silenceCount += 1;
-        if (silenceCount >= 3) {
-          pausePrompt('没听到声音，点麦克风继续', '继续收音');
-        } else {
-          setFeedback('没听到声音，再说一次', 'bad');
-        }
-        return;
-      }
-      if (code === 'aborted') return;
-      if (code === 'not-allowed' || code === 'service-not-allowed') {
+        if (silenceCount >= 3) pausePrompt('没听到声音，点麦克风继续', '继续收音');
+        else setFeedback('没听到声音，再说一次', 'bad');
+      } else if (code === 'not-allowed' || code === 'service-not-allowed') {
         failVoice('麦克风没有打开。允许权限后重试，或改用打字作答。');
-        return;
-      }
-      if (code === 'audio-capture') {
+      } else if (code === 'audio-capture') {
         failVoice('没有找到可用的麦克风。');
-        return;
+      } else if (code === 'offline-engine') {
+        failVoice('离线识别未能启动，请检查存储空间，或返回设置检查语音包。也可以改用打字。', true);
+      } else if (code === 'network') {
+        failVoice(inFrame ? '预览窗口里语音服务连不上，可以点「在新窗口打开」再试。' : '浏览器语音服务连不上，可返回设置下载离线语音包。');
+      } else {
+        failVoice('语音识别出了点问题，可以重试或改用打字作答。');
       }
-      if (code === 'network') {
-        failVoice(inFrame ? '预览窗口里语音服务连不上，可以点「在新窗口打开」再试。' : '语音服务暂时连不上，请稍后再试。');
-        return;
+    }
+    if (offlineReady) {
+      instance = OfflineVoice.listener({ start: started, text: transcript, error: failed });
+      return instance;
+    }
+    instance = new Recognition();
+    instance.lang = 'zh-CN';
+    instance.continuous = false;
+    instance.interimResults = true;
+    instance.maxAlternatives = 5;
+    instance.onstart = started;
+    instance.onerror = event => failed(event.error);
+    instance.onresult = event => {
+      for (let i = event.resultIndex; i < event.results.length && !locked; i += 1) {
+        const result = event.results[i];
+        transcript(Array.from(result, item => item.transcript || ''), result.isFinal);
       }
-      failVoice('语音识别出了点问题，可以重试或改用打字作答。');
     };
-
     instance.onend = () => {
+      if (recognition !== instance) return;
       isListening = false;
-      if (wantListen && !paused && view === 'practice' && !micProblem) {
-        scheduleRestart(200);
-      } else if (!micProblem) {
-        setVoiceState(wantListen ? 'paused' : 'idle');
-      }
+      if (active() && !micProblem) scheduleRestart(200);
+      else if (wantListen && !micProblem && !locked) setVoiceState('paused');
     };
-
     return instance;
   }
 
   function listen() {
-    if (!wantListen || paused || locked || view !== 'practice') return;
-    if (!recognition) recognition = createRecognition();
+    if (!wantListen || paused || locked || document.hidden || view !== 'practice') return;
     clearTimeout(restartTimer);
     try {
+      if (!recognition) recognition = createRecognition();
+      if (offlineReady) setVoiceState('preparing');
       recognition.start();
     } catch (error) {
       if (error && error.name === 'InvalidStateError') {
@@ -748,7 +827,7 @@
   }
 
   function startVoice() {
-    if (!Recognition) return;
+    el('voice-engine').textContent = offlineReady ? '离线语音 · 普通话' : '浏览器语音服务';
     wantListen = true;
     paused = false;
     micProblem = null;
@@ -764,21 +843,27 @@
     listen();
   }
 
-  function pauseVoice() {
+  function abortMic() {
+    clearTimeout(restartTimer);
+    if (recognition) {
+      try { recognition.abort(); } catch (_) { /* 已经停止 */ }
+    }
+    isListening = false;
+  }
+
+  function pauseVoice(release) {
     paused = true;
     clearTimeout(restartTimer);
-    if (recognition && isListening) {
-      try {
-        recognition.stop();
-      } catch (_) {
-        /* 已经停止 */
-      }
+    if (release) abortMic();
+    else if (recognition && recognition.hold) recognition.hold();
+    else if (recognition && isListening) {
+      try { recognition.stop(); } catch (_) { /* 已经停止 */ }
     }
     setVoiceState(wantListen ? 'thinking' : 'idle');
   }
 
   function resumeVoice() {
-    if (!Recognition || !wantListen || micProblem) return;
+    if (!wantListen || micProblem || document.hidden) return;
     paused = false;
     el('heard-text').textContent = '';
     listen();
@@ -789,12 +874,12 @@
     paused = true;
     micProblem = null;
     clearTimeout(restartTimer);
-    if (recognition) {
+    const previous = recognition;
+    recognition = null;
+    if (previous) {
       try {
-        recognition.abort();
-      } catch (_) {
-        /* 已经停止 */
-      }
+        if (previous.dispose) previous.dispose(); else previous.abort();
+      } catch (_) { /* 已经停止 */ }
     }
     isListening = false;
     setVoiceState('idle');
@@ -804,15 +889,7 @@
     wantListen = true;
     paused = true;
     micProblem = 'prompt';
-    clearTimeout(restartTimer);
-    if (recognition && isListening) {
-      try {
-        recognition.abort();
-      } catch (_) {
-        /* 已经停止 */
-      }
-    }
-    isListening = false;
+    abortMic();
     setVoiceState('paused');
     setVoiceLabel('点一下继续');
     el('voice-hint').textContent = message;
@@ -821,28 +898,21 @@
     el('new-tab').hidden = !inFrame;
   }
 
-  function failVoice(message) {
+  function failVoice(message, engineFailed) {
     wantListen = false;
     paused = true;
     micProblem = 'failed';
-    clearTimeout(restartTimer);
-    if (recognition) {
-      try {
-        recognition.abort();
-      } catch (_) {
-        /* 已经停止 */
-      }
-    }
-    isListening = false;
+    abortMic();
     setVoiceState('blocked');
-    setVoiceLabel('麦克风未开启');
+    setVoiceLabel(engineFailed ? '离线识别未启动' : '麦克风未开启');
     el('voice-hint').textContent = message;
-    el('voice-retry').textContent = '重新打开麦克风';
+    el('voice-retry').textContent = engineFailed ? '重试离线识别' : '重新打开麦克风';
     el('voice-actions').hidden = false;
     el('new-tab').hidden = !inFrame;
   }
 
   const VOICE_LABELS = {
+    preparing: '正在准备本机识别…',
     listening: '正在聆听…',
     thinking: '已听到',
     paused: '点一下继续',
@@ -881,7 +951,7 @@
 
     if (wantListen) {
       wantListen = false;
-      pauseVoice();
+      pauseVoice(true);
       setVoiceState('paused');
       setVoiceLabel('已暂停');
       setFeedback('已暂停收音，点麦克风继续');
@@ -922,13 +992,12 @@
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       if (view === 'practice') awaySince = performance.now();
-      if (isListening) {
+      if (recognition && offlineReady && wantListen && !micProblem) {
+        // iOS 从后台回来时通常需要新的用户手势才能解锁 AudioContext。
+        pausePrompt('切到后台时已关闭麦克风，点一下继续本题', '继续收音');
+      } else if (recognition) {
         paused = true;
-        try {
-          recognition.stop();
-        } catch (_) {
-          /* 已经停止 */
-        }
+        abortMic();
       }
       return;
     }
@@ -943,18 +1012,12 @@
     }
   });
 
-  window.addEventListener('beforeunload', () => {
-    if (recognition) {
-      try {
-        recognition.abort();
-      } catch (_) {
-        /* 已经停止 */
-      }
-    }
+  window.addEventListener('pagehide', () => {
+    if (download) download.abort();
+    stopVoice();
   });
 
-  /* ------------------------------------------------------------------ */
-
   syncSetup();
+  checkPack(true);
   window.kousuanReady = true;
 })();

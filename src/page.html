@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#f7f8fb">
+  <meta name="theme-color" content="#f8f7f2">
   <meta name="description" content="两位数、三位数的加减法口算练习，支持键盘输入与语音作答。">
   <title>速算练习</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -17,13 +17,69 @@
 <body>
   <main class="app-shell">
     <header class="topbar">
-      <a class="brand" href="./" aria-label="速算练习">
-        <span class="brand-mark" aria-hidden="true">＋</span>
+      <a class="brand" href="./" aria-label="速算练习首页">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M7 11h10m-5-5v10M18 20h8m-8 5h8"/></svg></span>
         <span>速算练习</span>
       </a>
+      <span class="brand-caption" lang="en">MATH LAB</span>
+      <span class="view-tag"><span aria-hidden="true"></span><span id="view-label">练习准备</span></span>
     </header>
 
-    <section id="setup" class="panel setup-panel" aria-label="练习设置">
+    <section id="welcome" aria-labelledby="welcome-title">
+      <div class="welcome-hero">
+        <div class="hero-copy">
+          <p class="eyebrow"><span></span>口算训练室 <b aria-hidden="true">/</b> <span lang="en">QUICK MATH</span></p>
+          <h1 id="welcome-title" tabindex="-1">让答案，<br><em>脱口而出。</em></h1>
+          <p class="hero-lead">看题、心算，说出答案。下载普通话语音包，<br class="wide-only">不联网也能在手机上练口算。</p>
+        </div>
+        <svg class="hero-art" viewBox="0 0 400 264" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="paper-grid" width="19" height="19" patternUnits="userSpaceOnUse"><path d="M19 0H0V19" fill="none" stroke="#bdcfc0" stroke-width="1"/></pattern>
+            <clipPath id="board-clip"><rect width="400" height="264" rx="20"/></clipPath>
+          </defs>
+          <g clip-path="url(#board-clip)">
+            <g class="art-paper"><rect width="400" height="264" fill="#dfebdc"/><rect width="400" height="264" fill="url(#paper-grid)"/></g>
+            <g fill="none" stroke="#88a792" stroke-width="1.6" stroke-linecap="round"><path d="M24 23h11m-5.5-5.5v11m336 207h11m-5.5-5.5v11"/><path d="M29 207q-2 13 12 11t5-10q-4-3-6 4t12 15"/></g>
+            <g transform="rotate(6 195 124)"><rect x="84" y="50" width="231" height="149" rx="12" fill="#a6b9a9"/><rect x="84" y="45" width="231" height="149" rx="12" fill="#bad0bd" stroke="#78987e"/></g>
+            <g transform="rotate(-9 183 121)">
+              <rect x="58" y="48" width="241" height="152" rx="12" fill="#91a993" opacity=".5"/>
+              <rect x="58" y="43" width="241" height="152" rx="12" fill="#fffdf6" stroke="#40584d" stroke-width="1.8"/>
+              <g font-family="system-ui,sans-serif" font-weight="700" font-size="9" letter-spacing="1.5" fill="#526b60"><text x="74" y="68">MATH CARD</text><text x="258" y="68">01</text></g>
+              <path d="M74 79h208" fill="none" stroke="#d8dfd2" stroke-dasharray="4 4"/>
+              <text x="77" y="140" fill="#263c34" font-family="system-ui,sans-serif" font-size="48" font-weight="750" letter-spacing="-2">47 <tspan fill="#d96741">+</tspan> 36</text>
+              <g fill="#c4d1c2"><rect x="74" y="166" width="41" height="4" rx="2"/><circle cx="123" cy="168" r="2"/></g>
+            </g>
+            <path d="m314 49 5 10 10 5-10 4-5 11-4-11-10-4 10-5z" fill="#ffcc78" stroke="#40584d" stroke-width="1.6"/>
+            <path d="m329 36 2 5 6 2-6 2-2 6-2-6-5-2 5-2z" fill="#40584d"/>
+            <g transform="rotate(5 268 194)">
+              <path d="M209 170h117a14 14 0 0 1 14 14v26a14 14 0 0 1-14 14h-88l-17 12 2-12h-14a14 14 0 0 1-14-14v-26a14 14 0 0 1 14-14z" fill="#90a694" opacity=".5"/>
+              <path d="M207 165h117a14 14 0 0 1 14 14v26a14 14 0 0 1-14 14h-88l-17 12 2-12h-14a14 14 0 0 1-14-14v-26a14 14 0 0 1 14-14z" fill="#ffb991" stroke="#40584d" stroke-width="1.8"/>
+              <g stroke="#543e31" stroke-width="3" stroke-linecap="round"><path d="M211 189v6m6-14v22m6-17v12m6-22v32m6-23v14m6-11v8"/></g>
+              <text x="252" y="200" fill="#443b2f" font-family="system-ui,sans-serif" font-size="21" font-weight="700">八十三</text>
+            </g>
+          </g>
+        </svg>
+      </div>
+
+      <div class="pack-card" id="pack-card" data-state="checking">
+        <div class="pack-heading"><span class="section-number" aria-hidden="true">01 /</span><h2>准备语音包</h2><span class="pack-state" id="pack-state">检查中</span></div>
+        <div class="pack-body">
+          <span class="pack-icon" aria-hidden="true"><svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="3" width="8" height="14" rx="4"/><path d="M6.5 13a7.5 7.5 0 0 0 15 0M14 21v4m-4 0h8M5 7v3m18-3v3"/></svg></span>
+          <div class="pack-copy"><h3>普通话离线语音包</h3><p>中文语音转数字 <span>·</span> 约 39 MB</p></div>
+          <button id="pack-button" class="primary-button pack-button" type="button" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v11m-4-4 4 4 4-4M5 15v4a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-4"/></svg><span id="pack-button-label">下载语音包</span></button>
+        </div>
+        <progress id="pack-progress" max="100" value="0" aria-label="语音包下载进度" hidden></progress>
+        <p id="pack-message" class="pack-message" role="status">正在检查此设备上的语音包…</p>
+        <a id="pack-new-tab" class="pack-new-tab" href="./" target="_blank" rel="noopener" hidden>在新窗口打开 ↗</a>
+      </div>
+      <div class="welcome-foot">
+        <span class="privacy-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 7 3v6c0 4-3.2 6.8-7 9-3.8-2.2-7-5-7-9V6z"/><path d="m9 12 2 2 4-4"/></svg>离线识别，声音不上传</span>
+        <button id="skip-pack" class="skip-button" type="button"><span id="skip-label">跳过，先用打字</span><span aria-hidden="true"> →</span></button>
+      </div>
+    </section>
+
+    <section id="setup" class="panel setup-panel" aria-label="练习设置" hidden>
+      <div class="setup-heading"><h1 id="setup-title" tabindex="-1">练习设置</h1><button id="manage-pack" class="mini-button" type="button">离线语音包</button></div>
       <fieldset class="setting-group">
         <legend>练习方式</legend>
         <div class="mode-grid">
@@ -102,6 +158,7 @@
         </form>
 
         <div id="voice-area" class="voice-area" hidden>
+          <p id="voice-engine" class="engine-label"></p>
           <button id="voice-button" class="voice-button" type="button" aria-pressed="false">
             <span class="voice-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5v3"/></svg>

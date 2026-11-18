@@ -1,0 +1,16 @@
+[
+  {
+    "file": "vosk-browser-0.0.8.js",
+    "blob": "d7b7c552f747e78b5715a902929807e762008c4c",
+    "size": 5804767,
+    "sha256": "29504515526e974f4cb053cf08811c4de5fb2a74007c0a5a957db50eaa8d5d0c",
+    "type": "application/javascript"
+  },
+  {
+    "file": "vosk-model-small-cn-0.3.tar.gz",
+    "blob": "d4ec3b63324b8f012407866cbe6a65a86a7d1e01",
+    "size": 33235437,
+    "sha256": "22cfe38dd2a9f5a8791c8dcd6442d44db68f8bf15ca10ca4150fea6e0946b119",
+    "type": "application/gzip"
+  }
+]
