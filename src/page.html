@@ -69,6 +69,11 @@
             <span class="mode-copy"><strong>语音作答</strong><small>只说数字，例如“八十三”</small></span>
             <span class="radio-dot" aria-hidden="true"></span>
           </button>
+          <button class="mode-card bubble-mode-card" type="button" data-mode="bubble" aria-pressed="false">
+            <span class="mode-icon bubble-mode-icon" aria-hidden="true"><span class="bubble-mark">●</span></span>
+            <span class="mode-copy"><strong>气泡寻数</strong><small>拖动数字球，点中正确答案</small></span>
+            <span class="radio-dot" aria-hidden="true"></span>
+          </button>
         </div>
         <p class="support-note" id="voice-note" hidden>这个浏览器不支持语音识别，先用打字作答也可以。</p>
         <p class="support-note tip" id="voice-tip" hidden>开始后请允许麦克风，只说数字即可。</p>
@@ -122,6 +127,11 @@
         <span class="question-kicker">请计算</span>
         <div id="question" class="question" aria-live="polite">47 <span>+</span> 36 <span>=</span> ?</div>
         <div id="feedback" class="feedback" role="status" aria-live="polite">仔细想一想，输入你的答案</div>
+
+        <div id="bubble-area" class="bubble-game" hidden>
+          <p class="bubble-instructions">拖动数字球，找到答案后点击它</p>
+          <div id="bubble-field" class="bubble-field" role="group" aria-label="数字气泡选项"></div>
+        </div>
 
         <form id="answer-form" autocomplete="off" novalidate>
           <label class="sr-only" for="answer">输入答案</label>
