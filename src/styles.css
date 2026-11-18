@@ -709,3 +709,324 @@ input:focus-visible {
   .question { font-size: 34px; }
   .result-stats { margin: 18px 0 12px; }
 }
+
+/* ---------- welcome / offline voice pack ---------- */
+
+.welcome-panel {
+  padding: 30px 30px 22px;
+  text-align: center;
+}
+
+.welcome-hero {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  margin: 0 auto 16px;
+  border-radius: 20px;
+  background: var(--lavender);
+  color: var(--lavender-ink);
+}
+
+.welcome-hero svg { position: relative; z-index: 1; width: 27px; height: 27px; }
+
+.welcome-wave {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 0 rgba(105, 88, 203, .22);
+  animation: packWave 2.6s ease-out infinite;
+}
+
+@keyframes packWave {
+  70%, 100% { box-shadow: 0 0 0 16px rgba(105, 88, 203, 0); }
+}
+
+.welcome-panel h2 {
+  margin: 4px 0 10px;
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  line-height: 1.35;
+}
+
+.welcome-lead {
+  max-width: 30em;
+  margin: 0 auto;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--muted);
+  text-align: left;
+}
+
+.welcome-lead strong { color: var(--ink-soft); }
+
+.pack-facts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 18px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pack-facts li {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 4px;
+  border-radius: 11px;
+  background: #f8f8fb;
+}
+
+.pack-facts strong { font-size: 12.5px; font-variant-numeric: tabular-nums; }
+
+.pack-facts span { margin-top: 3px; font-size: 10px; color: var(--muted); }
+
+.pack-progress { margin: 0 0 14px; }
+
+.pack-track {
+  height: 6px;
+  border-radius: 99px;
+  background: var(--line-soft);
+  overflow: hidden;
+}
+
+.pack-track span {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: var(--lavender-ink);
+  transition: width .4s ease;
+}
+
+/* 拿不到真实百分比时用一个来回跑的进度条，不假装知道进度 */
+.pack-track.is-indeterminate span {
+  width: 36% !important;
+  animation: packSlide 1.4s ease-in-out infinite;
+}
+
+@keyframes packSlide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(380%); }
+}
+
+.pack-stage {
+  margin-top: 8px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.welcome-cancel,
+.welcome-skip {
+  display: block;
+  margin: 6px auto 0;
+  padding: 8px 6px;
+  font-size: 12px;
+}
+
+.welcome-note {
+  margin-top: 10px;
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--muted-2);
+}
+
+.welcome-note code { font-size: 10px; }
+
+/* ---------- engine choice / pack row (setup) ---------- */
+
+.engine-choice { margin-top: 12px; }
+
+.engine-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.engine-options {
+  display: flex;
+  gap: 8px;
+}
+
+.engine-option {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  min-height: 44px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  text-align: left;
+}
+
+.engine-option strong { font-size: 12px; font-weight: 700; }
+
+.engine-option small { margin-top: 2px; font-size: 10px; color: var(--muted); }
+
+.engine-option.selected {
+  border-color: var(--lavender-ink);
+  background: #f7f5ff;
+}
+
+.engine-option.selected small { color: #6d61b5; }
+
+.engine-option:disabled { opacity: .5; }
+
+.pack-row {
+  display: flex;
+  align-items: center;
+  margin-top: 10px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: #f8f8fb;
+}
+
+.pack-row-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pack-row-copy strong { font-size: 11.5px; }
+
+.pack-row-copy small { margin-top: 2px; font-size: 10px; color: var(--muted); }
+
+.pack-row .mini-button { margin-left: 10px; min-height: 34px; padding: 0 12px; }
+
+.pack-row .mini-button:disabled { opacity: .55; }
+
+.offline-badge {
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--lavender-ink);
+  letter-spacing: .02em;
+}
+
+.voice-button.is-loading { background: #f4f3fb; color: #6d61b5; }
+
+/* ---------- phone layout ---------- */
+
+@media (max-width: 560px) {
+  .welcome-panel { padding: 24px 18px 18px; }
+  .welcome-panel h2 { font-size: 18.5px; }
+  .welcome-lead { font-size: 12px; }
+  .engine-options { gap: 6px; }
+  .pack-facts { gap: 6px; }
+}
+
+/* 手机：答题区贴底，题目占满剩下的高度，单手够得着 */
+@media (max-width: 560px) {
+  .app-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding-bottom: 0;
+  }
+
+  .practice-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 0;
+  }
+
+  .practice-panel .question-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    /* 左右不留内边距，下面贴底的答题条才能正好铺满面板宽度 */
+    padding: 26px 0 10px;
+  }
+
+  .answer-dock {
+    position: sticky;
+    bottom: 0;
+    margin: 0 -16px;
+    padding: 10px 16px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line-soft);
+    background: rgba(255, 255, 255, .96);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+
+  #answer-form { margin: 0; max-width: none; }
+
+  #answer { height: 52px; font-size: 19px; }
+
+  .submit-button {
+    height: 52px;
+    min-width: 92px;
+    font-size: 13px;
+    touch-action: manipulation;
+  }
+
+  .quantity-option,
+  .mode-card,
+  .difficulty-card,
+  .primary-button,
+  .mini-button,
+  .engine-option { touch-action: manipulation; }
+
+  .voice-area { margin-top: 10px; }
+
+  .voice-button {
+    width: 100%;
+    min-height: 52px;
+    font-size: 14px;
+    touch-action: manipulation;
+  }
+
+  .voice-actions .mini-button { min-height: 44px; }
+
+  .mistakes { max-height: 34vh; }
+
+  .results-panel { padding-bottom: calc(22px + env(safe-area-inset-bottom)); }
+
+  /* 键盘弹起时（iOS 会把视口压矮），别让题目被挤没 */
+  @media (max-height: 560px) {
+    .question { font-size: 30px; }
+    .question-area { padding-top: 10px; }
+    .feedback { min-height: 18px; }
+  }
+}
+
+/* 手指更粗的屏幕（手机横竖都算）：进度与关闭键至少 44px */
+@media (pointer: coarse) {
+  .quit-button,
+  .back-button,
+  .voice-switch,
+  .welcome-skip,
+  .welcome-cancel { min-height: 44px; }
+
+  .voice-switch { padding: 10px 6px; }
+}
+
+/* ---------- embedded browser / preview tip ---------- */
+
+.embed-tip {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff6e8;
+  color: #8a6a3c;
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+.embed-tip a {
+  margin-left: 4px;
+  color: #b25a25;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

@@ -24,12 +24,30 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # 模型包（models/vosk-model-small-cn.tar.gz）走 Git LFS，
+          # 不拉 LFS 文件的话线上离线语音会直接 404
+          lfs: true
+
+      - name: Verify build is up to date
+        run: |
+          python3 build.py
+          git diff --exit-code -- index.html || {
+            echo "::error::index.html 不是最新的，请在本地跑 python3 build.py 后一起提交";
+            exit 1;
+          }
+
+      - name: Verify model archive
+        run: python3 tools/fetch_model.py --verify
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
+
       - name: Upload website files
         uses: actions/upload-pages-artifact@v3
         with:
           path: .
+
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4

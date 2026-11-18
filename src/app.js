@@ -8,7 +8,7 @@
    * 对不上就带参数重新取一次页面。
    * ------------------------------------------------------------------ */
 
-  const REQUIRED_IDS = ['setup', 'practice', 'results', 'answer-form', 'question', 'voice-button'];
+  const REQUIRED_IDS = ['welcome', 'setup', 'practice', 'results', 'answer-form', 'question', 'voice-button'];
   const domMatches = REQUIRED_IDS.every((id) => document.getElementById(id));
   if (!domMatches) {
     if (location.search.indexOf('fresh=') === -1) {
@@ -41,10 +41,26 @@
 
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   const supportsSpeech = Boolean(Recognition);
-  const inFrame = window.self !== window.top;
-  const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
-  const defaults = { mode: 'type', level: 'two', count: 10 };
+  /* 离线识别：vendor/vosk-browser.js + models/ 里的中文小模型（见 src/offline-asr.js） */
+  const Offline = window.KousuanOffline;
+  const supportsOffline = Boolean(Offline && Offline.supported());
+  const supportsVoice = supportsSpeech || supportsOffline;
+
+  const inFrame = window.self !== window.top;
+
+  /* 个别旧 WebView 没有 matchMedia，取不到就当没有精确指针（不自动聚焦） */
+  function mediaMatches(query) {
+    try {
+      return typeof window.matchMedia === 'function' && window.matchMedia(query).matches;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  const finePointer = mediaMatches('(hover: hover) and (pointer: fine)');
+
+  const defaults = { mode: 'type', level: 'two', count: 10, engine: '', packPrompt: true };
   let prefs = { ...defaults };
   let best = {};
 
@@ -73,7 +89,9 @@
   if (['type', 'voice'].indexOf(prefs.mode) === -1) prefs.mode = defaults.mode;
   if (['two', 'mixed', 'three'].indexOf(prefs.level) === -1) prefs.level = defaults.level;
   if ([0, 10, 20, 30].indexOf(prefs.count) === -1) prefs.count = defaults.count;
-  if (!supportsSpeech) prefs.mode = 'type';
+  if (['offline', 'online'].indexOf(prefs.engine) === -1) prefs.engine = defaults.engine;
+  if (typeof prefs.packPrompt !== 'boolean') prefs.packPrompt = defaults.packPrompt;
+  if (!supportsVoice) prefs.mode = 'type';
 
   function persist() {
     try {
@@ -103,8 +121,124 @@
       setClass(button, 'selected', on);
       button.setAttribute('aria-pressed', String(on));
     });
-    el('voice-tip').hidden = !(prefs.mode === 'voice' && supportsSpeech);
+    el('voice-tip').hidden = !(prefs.mode === 'voice' && supportsVoice);
+    syncVoiceUI();
   }
+
+  /* ------------------------------------------------------------------ *
+   * 离线语音包 / 识别引擎
+   * ------------------------------------------------------------------ */
+
+  let downloading = false;
+  let downloadTimer = 0;
+  let downloadStartedAt = 0;
+  let downloadProgressText = '';
+
+  function formatMB(bytes) {
+    if (!bytes) return '';
+    return `${Math.max(1, Math.round(bytes / (1024 * 1024)))} MB`;
+  }
+
+  /* 没有明确选择时：装过离线包就用离线（手机最稳），否则用浏览器自带 */
+  function autoEngine() {
+    if (supportsOffline && Offline.state() === 'ready') return 'offline';
+    if (supportsSpeech) return 'online';
+    return supportsOffline ? 'offline' : 'online';
+  }
+
+  function engineNow() {
+    if (!supportsVoice) return 'none';
+    const wanted = prefs.engine || autoEngine();
+    if (wanted === 'offline' && supportsOffline) return 'offline';
+    if (wanted === 'online' && supportsSpeech) return 'online';
+    return supportsSpeech ? 'online' : (supportsOffline ? 'offline' : 'none');
+  }
+
+  function offlineReady() {
+    return supportsOffline && Offline.state() === 'ready';
+  }
+
+  function syncVoiceUI() {
+    const engine = engineNow();
+
+    const choice = el('engine-choice');
+    const showChoice = supportsOffline && supportsSpeech;
+    choice.hidden = !showChoice;
+    el('engine-offline-note').textContent = offlineReady()
+      ? (formatMB(Offline.sizeHint()) || '已下载')
+      : '未下载';
+    el('engine-online-note').textContent = '无需下载';
+
+    document.querySelectorAll('[data-engine]').forEach((button) => {
+      const value = button.dataset.engine;
+      const on = value === engine;
+      setClass(button, 'selected', on);
+      button.setAttribute('aria-pressed', String(on));
+      button.disabled = (value === 'offline' && !supportsOffline)
+        || (value === 'online' && !supportsSpeech);
+    });
+
+    const card = document.querySelector('[data-mode="voice"]');
+    if (card) {
+      const copy = card.querySelector('.mode-copy small');
+      if (!supportsVoice) copy.textContent = '此浏览器不支持';
+      else if (engine === 'offline') copy.textContent = offlineReady() ? '本机识别，断网可用' : '需先下载语音包';
+      else copy.textContent = '看题后直接说出答案';
+    }
+
+    const note = el('voice-note');
+    if (!supportsVoice) {
+      note.textContent = '这个浏览器既没有网页语音识别，也不支持离线语音包，先用打字作答吧。';
+      note.hidden = false;
+    } else if (!supportsSpeech) {
+      note.textContent = offlineReady()
+        ? '这个浏览器不支持网页语音识别，已改用本机离线识别。'
+        : '这个浏览器不支持网页语音识别。下载离线语音包后，手机也能说话答题。';
+      note.hidden = false;
+    } else if (!supportsOffline) {
+      note.textContent = '这个浏览器不支持离线语音包，只能用浏览器自带的在线识别。';
+      note.hidden = false;
+    } else {
+      note.hidden = true;
+    }
+
+    const row = el('pack-row');
+    row.hidden = !supportsOffline;
+    const size = Offline && Offline.sizeHint ? Offline.sizeHint() : 0;
+    if (downloadProgressText) {
+      el('pack-status').textContent = downloadProgressText;
+      el('pack-action').textContent = '下载中…';
+      el('pack-action').disabled = true;
+    } else if (offlineReady()) {
+      el('pack-status').textContent = formatMB(size) ? `已下载（${formatMB(size)}）` : '已下载';
+      el('pack-action').textContent = '已装好';
+      el('pack-action').disabled = true;
+    } else {
+      el('pack-status').textContent = '还没下载，下载后断网也能说话答题';
+      el('pack-action').textContent = '下载';
+      el('pack-action').disabled = false;
+    }
+
+    el('voice-tip').hidden = !(prefs.mode === 'voice' && supportsVoice);
+    if (prefs.mode === 'voice' && supportsVoice) {
+      el('voice-tip').textContent = engine === 'offline'
+        ? (offlineReady()
+          ? '开始后请允许麦克风，声音在本机识别，不联网也能用。'
+          : '开始后会先下载离线语音包（约 42 MB），之后就能断网使用。')
+        : '开始后请允许麦克风，说完答案会自动进入下一题。';
+    }
+
+    el('offline-badge').hidden = engine !== 'offline' || view !== 'practice';
+  }
+
+  document.querySelectorAll('[data-engine]').forEach((button) => {
+    button.addEventListener('click', () => {
+      if (button.disabled) return;
+      prefs.engine = button.dataset.engine;
+      persist();
+      syncVoiceUI();
+    });
+  });
 
   document.querySelectorAll('[data-mode]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -131,18 +265,140 @@
     });
   });
 
-  if (!supportsSpeech) {
+  if (!supportsVoice) {
     const voiceCard = document.querySelector('[data-mode="voice"]');
     if (voiceCard) {
       voiceCard.disabled = true;
       voiceCard.setAttribute('aria-describedby', 'voice-note');
-      voiceCard.querySelector('.mode-copy small').textContent = '此浏览器不支持';
     }
-    el('voice-note').hidden = false;
   }
 
-  el('start-button').addEventListener('click', startSession);
-  el('again-button').addEventListener('click', startSession);
+  /* 下载离线语音包：欢迎页和设置页共用一套进度显示 */
+  function setPackStage(text, hidden) {
+    el('welcome-progress').hidden = Boolean(hidden);
+    el('welcome-stage').textContent = text || '';
+  }
+
+  /* 下载和解压都在识别引擎的 Worker 里跑，拿不到真实百分比，
+     就别编数字：显示已用时间 + 不确定进度条 */
+  function setPackBusy(busy) {
+    const track = el('welcome-fill').parentElement;
+    setClass(track, 'is-indeterminate', busy);
+  }
+
+  function packSizeText() {
+    const size = Offline && Offline.sizeHint ? Offline.sizeHint() : 0;
+    return size ? `约 ${formatMB(size)}` : '约 42 MB';
+  }
+
+  function startPackDownload(fromWelcome) {
+    if (!supportsOffline || downloading) return;
+    if (fromWelcome) prefs.packPrompt = false;
+    downloading = true;
+    downloadStartedAt = performance.now();
+    el('welcome-download').disabled = true;
+    el('welcome-skip').hidden = true;
+    el('welcome-cancel').hidden = false;
+    setPackStage(`正在加载识别引擎，接着下载语音包（${packSizeText()}）…`, false);
+    setPackBusy(true);
+    syncVoiceUI();
+    persist();
+
+    let lastPhase = '';
+    clearInterval(downloadTimer);
+    downloadTimer = setInterval(() => {
+      const seconds = Math.round((performance.now() - downloadStartedAt) / 1000);
+      const nextPhase = Offline.status();
+      if (nextPhase !== lastPhase) lastPhase = nextPhase;
+      setPackStage(
+        `${nextPhase === 'engine' ? '正在加载识别引擎' : '正在下载语音包'}（${packSizeText()}）… `
+        + `已用 ${seconds} 秒，下载和准备期间请让页面留在前台`,
+        false
+      );
+      downloadProgressText = `下载中 · ${seconds}s`;
+      syncVoiceUI();
+    }, 1000);
+
+    Offline.download()
+      .then(() => {
+        clearInterval(downloadTimer);
+        downloading = false;
+        downloadProgressText = '';
+        setPackBusy(false);
+        el('welcome-fill').style.width = '100%';
+        setPackStage('离线语音包已装好，现在断网也能说话答题。', false);
+        prefs.engine = 'offline';
+        persist();
+        syncVoiceUI();
+        setTimeout(() => {
+          el('welcome-cancel').hidden = true;
+          if (view === 'welcome') showView('setup');
+        }, 1200);
+      })
+      .catch((error) => {
+        clearInterval(downloadTimer);
+        downloading = false;
+        downloadProgressText = '';
+        setPackBusy(false);
+        const cancelled = error && error.message === 'cancelled';
+        setPackStage(
+          cancelled
+            ? '已取消下载，需要时可以再点一次。'
+            : '下载没成功。可能是网络被拦住了，换个网络再试，或者先用打字作答。',
+          false
+        );
+        el('welcome-cancel').hidden = true;
+        el('welcome-skip').hidden = false;
+        el('welcome-download').disabled = false;
+        el('welcome-download').querySelector('span').textContent = '重新下载离线语音包';
+        syncVoiceUI();
+      });
+  }
+
+  el('welcome-download').addEventListener('click', () => startPackDownload(true));
+  el('welcome-cancel').addEventListener('click', () => {
+    if (Offline) Offline.cancel();
+  });
+  el('welcome-skip').addEventListener('click', () => {
+    prefs.packPrompt = false;
+    if (prefs.mode === 'voice' && engineNow() === 'offline' && !offlineReady()) {
+      /* 用户不想下载：退回浏览器自带识别（如果支持），否则用打字 */
+      prefs.mode = supportsSpeech ? 'voice' : 'type';
+      if (supportsSpeech) prefs.engine = 'online';
+    }
+    persist();
+    syncSetup();
+    el('welcome-skip').textContent = '先用打字作答，稍后再下载';
+    showView('setup');
+  });
+  el('pack-action').addEventListener('click', () => {
+    if (downloading || offlineReady()) return;
+    startPackDownload(false);
+  });
+
+  if (supportsOffline) {
+    Offline.probeSize(Offline.modelUrls[0]).then(() => syncVoiceUI()).catch(() => {});
+  }
+
+  function beginOrAsk() {
+    /* 选了离线识别但语音包还没装：先去装，装完再开始，别让练习页空等 */
+    if (prefs.mode === 'voice' && engineNow() === 'offline' && !offlineReady()) {
+      el('welcome-stage').textContent = '说话答题要先装一次离线语音包，装好后就能断网使用。';
+      el('welcome-progress').hidden = false;
+      el('welcome-fill').style.width = '0%';
+      el('welcome-skip').textContent = '先不下载，改用打字作答';
+      showView('welcome');
+      return;
+    }
+    startSession();
+  }
+
+  el('start-button').addEventListener('click', () => {
+    /* 在点击里解锁音频，手机上离线识别才采得到声音 */
+    if (supportsOffline) Offline.unlock();
+    beginOrAsk();
+  });
+  el('again-button').addEventListener('click', beginOrAsk);
 
   el('settings-button').addEventListener('click', () => {
     syncSetup();
@@ -242,14 +498,16 @@
     applyModeLayout();
     nextQuestion();
 
-    if (prefs.mode === 'voice' && supportsSpeech) startVoice();
+    if (prefs.mode === 'voice' && supportsVoice) startVoice();
   }
 
   function applyModeLayout() {
     const isVoice = prefs.mode === 'voice';
     el('answer-form').hidden = isVoice;
     el('voice-area').hidden = !isVoice;
+    el('answer-dock').hidden = isVoice;
     el('practice').dataset.mode = prefs.mode;
+    el('offline-badge').hidden = !(isVoice && engineNow() === 'offline' && view === 'practice');
   }
 
   function nextQuestion() {
@@ -458,9 +716,11 @@
 
   function showView(next) {
     view = next;
+    el('welcome').hidden = next !== 'welcome';
     el('setup').hidden = next !== 'setup';
     el('practice').hidden = next !== 'practice';
     el('results').hidden = next !== 'results';
+    el('offline-badge').hidden = next !== 'practice' || engineNow() !== 'offline';
     window.scrollTo(0, 0);
   }
 
@@ -637,6 +897,19 @@
   let hasStarted = false;
   let silenceCount = 0;
 
+  /* 两个引擎拿到最终文本后都走这里：解析数字 → 判题 */
+  function handleHeard(text) {
+    if (locked || view !== 'practice' || !session) return;
+    silenceCount = 0;
+    const value = parseSpokenNumber(text);
+    if (value === null) {
+      setFeedback('没听清，再说一次', 'bad');
+      return;
+    }
+    setFeedback('');
+    submit(value);
+  }
+
   function createRecognition() {
     const instance = new Recognition();
     instance.lang = 'zh-CN';
@@ -747,7 +1020,96 @@
     }, delay);
   }
 
+  /* ------------------------------------------------------------------ *
+   * 离线识别（Vosk，在本机跑）
+   * ------------------------------------------------------------------ */
+
+  let offlineSession = null;
+
+  function startOfflineVoice() {
+    /* 只在这次练习还没启动过会话时重建，切标签页回来要走 rescue 路径 */
+    showView('practice');
+    wantListen = true;
+    paused = false;
+    micProblem = null;
+    silenceCount = 0;
+    el('heard-text').textContent = '';
+    el('voice-actions').hidden = true;
+    el('new-tab').hidden = !inFrame;
+    el('voice-hint').textContent = '正在准备离线语音…';
+    el('offline-badge').hidden = false;
+    setFeedback('看着题目，直接说出答案');
+    setVoiceState('loading');
+
+    if (offlineSession && (offlineSession.running || offlineSession.starting)) {
+      setVoiceState('listening');
+      return;
+    }
+
+    if (!offlineSession) {
+      offlineSession = Offline.createSession({
+        onState(state) {
+          if (state === 'listening') {
+            setVoiceState('listening');
+            el('offline-badge').hidden = false;
+          } else if (state === 'loading') {
+            setVoiceState('loading');
+          } else if (state === 'paused') {
+            setVoiceState(wantListen ? 'thinking' : 'idle');
+          } else {
+            setVoiceState('idle');
+          }
+        },
+        onHint(text) {
+          el('voice-hint').textContent = text;
+        },
+        onText(text, isFinal) {
+          el('heard-text').textContent = text;
+          if (!isFinal) return;
+          handleHeard(text);
+        },
+        onSilence() {
+          silenceCount += 1;
+          if (silenceCount >= 3) pausePrompt('没听到声音，点麦克风继续', '继续收音');
+          else setFeedback('没听到声音，再说一次', 'bad');
+        },
+        onReady() {
+          silenceCount = 0;
+        },
+        onError(kind, error) {
+          if (kind === 'mic-denied') {
+            failVoice('麦克风没有打开。允许权限后重试，或改用打字作答。');
+          } else if (kind === 'mic-missing') {
+            failVoice('没有找到可用的麦克风。');
+          } else if (kind === 'offline-start') {
+            failVoice('离线语音没能启动。可以点「重新打开麦克风」，或者改用打字作答。');
+            el('voice-hint').textContent = `离线语音没能启动（${(error && error.message) || '未知原因'}）。`;
+          } else {
+            setFeedback('识别出了点问题，再说一次', 'bad');
+          }
+        },
+      });
+    }
+
+    offlineSession.start();
+  }
+
+  function stopOfflineVoice() {
+    if (offlineSession) {
+      offlineSession.stop();
+      offlineSession = null;
+    }
+  }
+
+  /* ------------------------------------------------------------------ *
+   * 语音控制：两个引擎共用一套状态
+   * ------------------------------------------------------------------ */
+
   function startVoice() {
+    if (engineNow() === 'offline') {
+      startOfflineVoice();
+      return;
+    }
     if (!Recognition) return;
     wantListen = true;
     paused = false;
@@ -757,6 +1119,7 @@
     el('heard-text').textContent = '';
     el('voice-actions').hidden = true;
     el('new-tab').hidden = !inFrame;
+    el('offline-badge').hidden = true;
     el('voice-hint').textContent = '说完答案会自动进入下一题，点麦克风可暂停';
     el('feedback').className = 'feedback';
     setFeedback('看着题目，直接说出答案');
@@ -767,6 +1130,11 @@
   function pauseVoice() {
     paused = true;
     clearTimeout(restartTimer);
+    if (engineNow() === 'offline') {
+      if (offlineSession) offlineSession.pause();
+      setVoiceState(wantListen ? 'thinking' : 'idle');
+      return;
+    }
     if (recognition && isListening) {
       try {
         recognition.stop();
@@ -778,9 +1146,19 @@
   }
 
   function resumeVoice() {
-    if (!Recognition || !wantListen || micProblem) return;
+    if (!wantListen || micProblem) return;
     paused = false;
     el('heard-text').textContent = '';
+    if (engineNow() === 'offline') {
+      if (offlineSession) {
+        offlineSession.resume();
+        offlineSession.reset();
+      } else {
+        startOfflineVoice();
+      }
+      return;
+    }
+    if (!Recognition) return;
     listen();
   }
 
@@ -796,7 +1174,9 @@
         /* 已经停止 */
       }
     }
+    stopOfflineVoice();
     isListening = false;
+    el('offline-badge').hidden = true;
     setVoiceState('idle');
   }
 
@@ -812,6 +1192,7 @@
         /* 已经停止 */
       }
     }
+    if (offlineSession) offlineSession.pause();
     isListening = false;
     setVoiceState('paused');
     setVoiceLabel('点一下继续');
@@ -843,6 +1224,7 @@
   }
 
   const VOICE_LABELS = {
+    loading: '正在准备…',
     listening: '正在聆听…',
     thinking: '已听到',
     paused: '点一下继续',
@@ -852,6 +1234,7 @@
 
   function setVoiceState(state) {
     const button = el('voice-button');
+    setClass(button, 'is-loading', state === 'loading');
     setClass(button, 'is-listening', state === 'listening');
     setClass(button, 'is-thinking', state === 'thinking');
     setClass(button, 'is-paused', state === 'paused');
@@ -875,7 +1258,8 @@
       el('voice-actions').hidden = true;
       el('voice-hint').textContent = '说完答案会自动进入下一题，点麦克风可暂停';
       setVoiceState('listening');
-      listen();
+      if (engineNow() === 'offline') startOfflineVoice();
+      else listen();
       return;
     }
 
@@ -900,7 +1284,12 @@
     el('voice-actions').hidden = true;
     el('voice-hint').textContent = '说完答案会自动进入下一题，点麦克风可暂停';
     setVoiceState('listening');
-    listen();
+    if (engineNow() === 'offline') {
+      stopOfflineVoice();
+      startOfflineVoice();
+    } else {
+      listen();
+    }
   });
 
   el('new-tab').addEventListener('click', () => {
@@ -922,6 +1311,11 @@
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       if (view === 'practice') awaySince = performance.now();
+      if (offlineSession) {
+        /* 手机切走时先放掉麦克风（状态栏那个录音点会消失），回来再重开 */
+        paused = true;
+        stopOfflineVoice();
+      }
       if (isListening) {
         paused = true;
         try {
@@ -939,11 +1333,23 @@
     }
     if (view === 'practice' && prefs.mode === 'voice' && wantListen && !locked && !micProblem) {
       paused = false;
-      listen();
+      if (engineNow() === 'offline') rescueOfflineVoice();
+      else listen();
     }
   });
 
+  /* 手机切回来（或用户点了继续）时，离线会话可能已经被系统收掉了，重建一次 */
+  function rescueOfflineVoice() {
+    if (offlineSession && offlineSession.running) {
+      offlineSession.resume();
+      return;
+    }
+    stopOfflineVoice();
+    startOfflineVoice();
+  }
+
   window.addEventListener('beforeunload', () => {
+    stopOfflineVoice();
     if (recognition) {
       try {
         recognition.abort();
@@ -956,5 +1362,14 @@
   /* ------------------------------------------------------------------ */
 
   syncSetup();
+
+  /* 第一次打开（或语音包还没装）先停在语音包这一步 */
+  if (supportsOffline && !offlineReady() && prefs.packPrompt) {
+    showView('welcome');
+    Offline.probeSize(Offline.modelUrls[0]).then(() => syncVoiceUI()).catch(() => {});
+  } else {
+    showView('setup');
+  }
+
   window.kousuanReady = true;
 })();

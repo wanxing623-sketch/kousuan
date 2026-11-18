@@ -724,16 +724,372 @@ input:focus-visible {
   .question { font-size: 34px; }
   .result-stats { margin: 18px 0 12px; }
 }
+
+/* ---------- welcome / offline voice pack ---------- */
+
+.welcome-panel {
+  padding: 30px 30px 22px;
+  text-align: center;
+}
+
+.welcome-hero {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  margin: 0 auto 16px;
+  border-radius: 20px;
+  background: var(--lavender);
+  color: var(--lavender-ink);
+}
+
+.welcome-hero svg { position: relative; z-index: 1; width: 27px; height: 27px; }
+
+.welcome-wave {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 0 rgba(105, 88, 203, .22);
+  animation: packWave 2.6s ease-out infinite;
+}
+
+@keyframes packWave {
+  70%, 100% { box-shadow: 0 0 0 16px rgba(105, 88, 203, 0); }
+}
+
+.welcome-panel h2 {
+  margin: 4px 0 10px;
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -.01em;
+  line-height: 1.35;
+}
+
+.welcome-lead {
+  max-width: 30em;
+  margin: 0 auto;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--muted);
+  text-align: left;
+}
+
+.welcome-lead strong { color: var(--ink-soft); }
+
+.pack-facts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 18px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pack-facts li {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 4px;
+  border-radius: 11px;
+  background: #f8f8fb;
+}
+
+.pack-facts strong { font-size: 12.5px; font-variant-numeric: tabular-nums; }
+
+.pack-facts span { margin-top: 3px; font-size: 10px; color: var(--muted); }
+
+.pack-progress { margin: 0 0 14px; }
+
+.pack-track {
+  height: 6px;
+  border-radius: 99px;
+  background: var(--line-soft);
+  overflow: hidden;
+}
+
+.pack-track span {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: var(--lavender-ink);
+  transition: width .4s ease;
+}
+
+/* 拿不到真实百分比时用一个来回跑的进度条，不假装知道进度 */
+.pack-track.is-indeterminate span {
+  width: 36% !important;
+  animation: packSlide 1.4s ease-in-out infinite;
+}
+
+@keyframes packSlide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(380%); }
+}
+
+.pack-stage {
+  margin-top: 8px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.welcome-cancel,
+.welcome-skip {
+  display: block;
+  margin: 6px auto 0;
+  padding: 8px 6px;
+  font-size: 12px;
+}
+
+.welcome-note {
+  margin-top: 10px;
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--muted-2);
+}
+
+.welcome-note code { font-size: 10px; }
+
+/* ---------- engine choice / pack row (setup) ---------- */
+
+.engine-choice { margin-top: 12px; }
+
+.engine-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.engine-options {
+  display: flex;
+  gap: 8px;
+}
+
+.engine-option {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  min-height: 44px;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  text-align: left;
+}
+
+.engine-option strong { font-size: 12px; font-weight: 700; }
+
+.engine-option small { margin-top: 2px; font-size: 10px; color: var(--muted); }
+
+.engine-option.selected {
+  border-color: var(--lavender-ink);
+  background: #f7f5ff;
+}
+
+.engine-option.selected small { color: #6d61b5; }
+
+.engine-option:disabled { opacity: .5; }
+
+.pack-row {
+  display: flex;
+  align-items: center;
+  margin-top: 10px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: #f8f8fb;
+}
+
+.pack-row-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pack-row-copy strong { font-size: 11.5px; }
+
+.pack-row-copy small { margin-top: 2px; font-size: 10px; color: var(--muted); }
+
+.pack-row .mini-button { margin-left: 10px; min-height: 34px; padding: 0 12px; }
+
+.pack-row .mini-button:disabled { opacity: .55; }
+
+.offline-badge {
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--lavender-ink);
+  letter-spacing: .02em;
+}
+
+.voice-button.is-loading { background: #f4f3fb; color: #6d61b5; }
+
+/* ---------- phone layout ---------- */
+
+@media (max-width: 560px) {
+  .welcome-panel { padding: 24px 18px 18px; }
+  .welcome-panel h2 { font-size: 18.5px; }
+  .welcome-lead { font-size: 12px; }
+  .engine-options { gap: 6px; }
+  .pack-facts { gap: 6px; }
+}
+
+/* 手机：答题区贴底，题目占满剩下的高度，单手够得着 */
+@media (max-width: 560px) {
+  .app-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding-bottom: 0;
+  }
+
+  .practice-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 0;
+  }
+
+  .practice-panel .question-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    /* 左右不留内边距，下面贴底的答题条才能正好铺满面板宽度 */
+    padding: 26px 0 10px;
+  }
+
+  .answer-dock {
+    position: sticky;
+    bottom: 0;
+    margin: 0 -16px;
+    padding: 10px 16px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line-soft);
+    background: rgba(255, 255, 255, .96);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+
+  #answer-form { margin: 0; max-width: none; }
+
+  #answer { height: 52px; font-size: 19px; }
+
+  .submit-button {
+    height: 52px;
+    min-width: 92px;
+    font-size: 13px;
+    touch-action: manipulation;
+  }
+
+  .quantity-option,
+  .mode-card,
+  .difficulty-card,
+  .primary-button,
+  .mini-button,
+  .engine-option { touch-action: manipulation; }
+
+  .voice-area { margin-top: 10px; }
+
+  .voice-button {
+    width: 100%;
+    min-height: 52px;
+    font-size: 14px;
+    touch-action: manipulation;
+  }
+
+  .voice-actions .mini-button { min-height: 44px; }
+
+  .mistakes { max-height: 34vh; }
+
+  .results-panel { padding-bottom: calc(22px + env(safe-area-inset-bottom)); }
+
+  /* 键盘弹起时（iOS 会把视口压矮），别让题目被挤没 */
+  @media (max-height: 560px) {
+    .question { font-size: 30px; }
+    .question-area { padding-top: 10px; }
+    .feedback { min-height: 18px; }
+  }
+}
+
+/* 手指更粗的屏幕（手机横竖都算）：进度与关闭键至少 44px */
+@media (pointer: coarse) {
+  .quit-button,
+  .back-button,
+  .voice-switch,
+  .welcome-skip,
+  .welcome-cancel { min-height: 44px; }
+
+  .voice-switch { padding: 10px 6px; }
+}
+
+/* ---------- embedded browser / preview tip ---------- */
+
+.embed-tip {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff6e8;
+  color: #8a6a3c;
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+.embed-tip a {
+  margin-left: 4px;
+  color: #b25a25;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
   </style>
 </head>
 <body>
   <main class="app-shell">
+    <div id="embed-tip" class="embed-tip" hidden>
+      现在是在应用内的预览窗口里打开，麦克风和声音下载都容易被拦。
+      <a href="#" target="_blank" rel="noopener">在新窗口打开</a>
+    </div>
     <header class="topbar">
       <a class="brand" href="./" aria-label="速算练习">
         <span class="brand-mark" aria-hidden="true">＋</span>
         <span>速算练习</span>
       </a>
     </header>
+
+
+    <section id="welcome" class="panel welcome-panel" aria-label="离线语音包" hidden>
+      <div class="welcome-hero" aria-hidden="true">
+        <span class="welcome-wave"></span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5v3"/></svg>
+      </div>
+      <h2>先装上离线语音，手机也能说话答题</h2>
+      <p class="welcome-lead">
+        手机浏览器（尤其微信、QQ 里的内置浏览器）经常用不了网页自带的语音识别。
+        下载一次离线的中文语音包，声音在这台手机上直接识别，<strong>不用联网、不上传录音</strong>。
+      </p>
+
+      <ul class="pack-facts">
+        <li><strong>约 42 MB</strong><span>只需下载一次</span></li>
+        <li><strong>本机识别</strong><span>录音不出设备</span></li>
+        <li><strong>不用联网</strong><span>说话答题不再连服务器</span></li>
+      </ul>
+
+      <div id="welcome-progress" class="pack-progress" hidden>
+        <div class="pack-track"><span id="welcome-fill"></span></div>
+        <p id="welcome-stage" class="pack-stage">正在准备…</p>
+      </div>
+
+      <button id="welcome-download" class="primary-button" type="button">
+        <span>下载离线语音包</span><span class="button-arrow" aria-hidden="true">↓</span>
+      </button>
+      <button id="welcome-cancel" class="text-button welcome-cancel" type="button" hidden>取消下载</button>
+      <button id="welcome-skip" class="text-button welcome-skip" type="button">先用打字作答，稍后再下载</button>
+      <p class="welcome-note">语音包来自开源项目 Vosk（Apache-2.0），模型 <code>vosk-model-small-cn-0.22</code>，下载后保存在浏览器本地。</p>
+    </section>
 
     <section id="setup" class="panel setup-panel" aria-label="练习设置">
       <fieldset class="setting-group">
@@ -753,6 +1109,24 @@ input:focus-visible {
             <span class="mode-copy"><strong>语音作答</strong><small>看题后直接说出答案</small></span>
             <span class="radio-dot" aria-hidden="true"></span>
           </button>
+        </div>
+        <div id="engine-choice" class="engine-choice" hidden>
+          <span class="engine-label">语音识别方式</span>
+          <div class="engine-options" role="group" aria-label="语音识别方式">
+            <button class="engine-option selected" type="button" data-engine="offline" aria-pressed="true">
+              <strong>离线识别</strong><small id="engine-offline-note">未下载</small>
+            </button>
+            <button class="engine-option" type="button" data-engine="online" aria-pressed="false">
+              <strong>浏览器在线</strong><small id="engine-online-note">无需下载</small>
+            </button>
+          </div>
+        </div>
+        <div id="pack-row" class="pack-row" hidden>
+          <div class="pack-row-copy">
+            <strong id="pack-title">离线语音包</strong>
+            <small id="pack-status">还没下载</small>
+          </div>
+          <button id="pack-action" class="mini-button" type="button">下载</button>
         </div>
         <p class="support-note" id="voice-note" hidden>这个浏览器不支持语音识别，先用打字作答也可以。</p>
         <p class="support-note tip" id="voice-tip" hidden>开始后请允许麦克风，说完答案会自动进入下一题。</p>
@@ -807,11 +1181,13 @@ input:focus-visible {
         <div id="question" class="question" aria-live="polite">47 <span>+</span> 36 <span>=</span> ?</div>
         <div id="feedback" class="feedback" role="status" aria-live="polite">仔细想一想，输入你的答案</div>
 
-        <form id="answer-form" autocomplete="off" novalidate>
-          <label class="sr-only" for="answer">输入答案</label>
-          <input id="answer" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="输入答案" autocomplete="off" enterkeyhint="done">
-          <button class="submit-button" type="submit">确认答案 <span aria-hidden="true">↗</span></button>
-        </form>
+        <div id="answer-dock" class="answer-dock">
+          <form id="answer-form" autocomplete="off" novalidate>
+            <label class="sr-only" for="answer">输入答案</label>
+            <input id="answer" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="输入答案" autocomplete="off" enterkeyhint="done">
+            <button class="submit-button" type="submit">确认答案 <span aria-hidden="true">↗</span></button>
+          </form>
+        </div>
 
         <div id="voice-area" class="voice-area" hidden>
           <button id="voice-button" class="voice-button" type="button" aria-pressed="false">
@@ -822,6 +1198,7 @@ input:focus-visible {
           </button>
           <p id="heard-text" class="heard-text" aria-live="polite"></p>
           <p id="voice-hint" class="voice-hint">说完答案会自动进入下一题，点麦克风可暂停</p>
+          <p id="offline-badge" class="offline-badge" hidden>离线识别 · 录音不出本机</p>
           <div id="voice-actions" class="voice-actions" hidden>
             <button id="voice-retry" class="mini-button" type="button">重新打开麦克风</button>
             <button id="new-tab" class="mini-button" type="button" hidden>在新窗口打开</button>
@@ -850,6 +1227,608 @@ input:focus-visible {
   </main>
 
   <script>
+/* ------------------------------------------------------------------ *
+ * 离线语音识别（本机运行，不联网、不上传声音）
+ *
+ * 引擎：[vosk-browser](https://github.com/ccoreilly/vosk-browser) 0.0.8，
+ *       Vosk 的 WebAssembly 版本（Apache-2.0），脚本放在 vendor/ 里本地化，
+ *       不走 CDN —— 内地网络访问 CDN 经常失败，本机文件最稳。
+ * 模型：vosk-model-small-cn-0.22（Alpha Cephei，Apache-2.0），
+ *       打包成 models/vosk-model-small-cn.tar.gz，第一次使用时下载，
+ *       之后由引擎解压进浏览器的 IndexedDB，没网也能用。
+ *
+ * 这个文件只负责「引擎 / 模型 / 麦克风 / 识别」，不认识题目、不碰界面；
+ * 解析数字和判断答案仍然由 app.js 负责。
+ * ------------------------------------------------------------------ */
+
+(() => {
+  'use strict';
+
+  const ENGINE_URL = 'vendor/vosk-browser.js';
+  const STORE_KEY = 'kousuan:voicepack:v1';
+  const MODEL_FILE = 'models/vosk-model-small-cn.tar.gz';
+  const REPO = 'wanxing623-sketch/kousuan';
+
+  /* 同源优先；jsDelivr 与 raw 只是备用线路，三条都带 CORS，fetch 能直接读 */
+  const MODEL_URLS = [
+    MODEL_FILE,
+    `https://cdn.jsdelivr.net/gh/${REPO}@main/${MODEL_FILE}`,
+    `https://raw.githubusercontent.com/${REPO}/main/${MODEL_FILE}`,
+  ];
+
+  const SAMPLE_RATE = 16000;
+  const SILENCE_MS = 14000;
+
+  let enginePromise = null;
+  let model = null;
+  let modelPromise = null;
+  let pendingModel = null;
+  let activeUrl = '';
+  let cancelled = false;
+  let status = 'idle'; /* idle | engine | download | ready | error */
+  let lastError = '';
+  let sizeBytes = 0;
+
+  /* ------------------------------------------------------------------ *
+   * 能力检测 / 本地记录
+   * ------------------------------------------------------------------ */
+
+  function supported() {
+    return (
+      typeof WebAssembly === 'object'
+      && typeof Promise !== 'undefined'
+      && !!(window.AudioContext || window.webkitAudioContext)
+      && !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
+    );
+  }
+
+  function readSaved() {
+    try {
+      const raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return { ready: false, url: '' };
+      const data = JSON.parse(raw);
+      return {
+        ready: Boolean(data && data.ready),
+        url: data && typeof data.url === 'string' ? data.url : '',
+      };
+    } catch (_) {
+      return { ready: false, url: '' };
+    }
+  }
+
+  function writeSaved(ready, url) {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify({ ready, url: url || '', at: Date.now() }));
+    } catch (_) {
+      /* 存不下也不影响这次使用 */
+    }
+  }
+
+  function urlList() {
+    const saved = readSaved();
+    const list = saved.url ? [saved.url].concat(MODEL_URLS) : MODEL_URLS.slice();
+    const seen = {};
+    return list.filter((item) => {
+      if (!item || seen[item]) return false;
+      seen[item] = true;
+      return true;
+    });
+  }
+
+  /* ------------------------------------------------------------------ *
+   * 引擎脚本（5.6 MB，只在需要时加载一次）
+   * ------------------------------------------------------------------ */
+
+  function loadEngine() {
+    if (window.Vosk && window.Vosk.createModel) return Promise.resolve(window.Vosk);
+    if (enginePromise) return enginePromise;
+
+    enginePromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = ENGINE_URL;
+      script.async = true;
+      script.onload = () => {
+        if (window.Vosk && window.Vosk.createModel) resolve(window.Vosk);
+        else reject(new Error('engine-broken'));
+      };
+      script.onerror = () => {
+        enginePromise = null;
+        reject(new Error('engine-load-failed'));
+      };
+      document.head.appendChild(script);
+    });
+
+    return enginePromise;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * 模型
+   * ------------------------------------------------------------------ */
+
+  /* 只用来把真实体积显示给用户，失败就退回保守估计 */
+  function probeSize(url) {
+    if (sizeBytes) return Promise.resolve(sizeBytes);
+    if (typeof fetch !== 'function') return Promise.resolve(0);
+    return fetch(url, { method: 'HEAD' })
+      .then((response) => {
+        const length = Number(response.headers.get('content-length'));
+        if (response.ok && length > 0) sizeBytes = length;
+        return sizeBytes;
+      })
+      .catch(() => 0);
+  }
+
+  function createModelHandle(Vosk, url) {
+    return new Promise((resolve, reject) => {
+      let handle;
+      try {
+        handle = new Vosk.Model(url);
+      } catch (error) {
+        reject(error);
+        return;
+      }
+      pendingModel = handle;
+      let settled = false;
+      handle.on('load', (message) => {
+        if (settled) return;
+        settled = true;
+        pendingModel = null;
+        if (message && message.result) resolve(handle);
+        else reject(new Error('model-load-failed'));
+      });
+      handle.on('error', (message) => {
+        if (settled) return;
+        settled = true;
+        pendingModel = null;
+        reject(new Error((message && message.error) || 'model-load-failed'));
+      });
+    });
+  }
+
+  function download(onProgress) {
+    const report = typeof onProgress === 'function' ? onProgress : () => {};
+    cancelled = false;
+    lastError = '';
+    status = 'engine';
+    report({ phase: 'engine' });
+
+    return loadEngine()
+      .then((Vosk) => {
+        const urls = urlList();
+        status = 'download';
+        report({ phase: 'download', index: 0, total: urls.length });
+
+        const attempt = (index) => {
+          if (cancelled) return Promise.reject(new Error('cancelled'));
+          if (index >= urls.length) return Promise.reject(new Error(lastError || 'download-failed'));
+          const url = urls[index];
+          report({ phase: 'download', index, total: urls.length, url });
+          return createModelHandle(Vosk, url)
+            .then((handle) => {
+              if (cancelled) {
+                try {
+                  handle.terminate();
+                } catch (_) {
+                  /* 已经结束 */
+                }
+                throw new Error('cancelled');
+              }
+              model = handle;
+              activeUrl = url;
+              status = 'ready';
+              writeSaved(true, url);
+              report({ phase: 'ready', url });
+              return model;
+            })
+            .catch((error) => {
+              if (cancelled) throw error;
+              lastError = (error && error.message) || String(error);
+              report({ phase: 'retry', index, total: urls.length, message: lastError });
+              return attempt(index + 1);
+            });
+        };
+
+        return attempt(0);
+      })
+      .catch((error) => {
+        status = 'error';
+        lastError = (error && error.message) || String(error);
+        report({ phase: 'error', message: lastError });
+        throw error;
+      });
+  }
+
+  function cancel() {
+    cancelled = true;
+    const handle = pendingModel;
+    pendingModel = null;
+    if (handle) {
+      try {
+        handle.terminate();
+      } catch (_) {
+        /* 已经结束 */
+      }
+    }
+    if (status !== 'ready') status = 'idle';
+  }
+
+  /* 已经是「下载过」状态时，第二次进页面只从 IndexedDB 里装载，不再联网 */
+  function ensureModel() {
+    if (model) return Promise.resolve(model);
+    if (modelPromise) return modelPromise;
+
+    status = 'engine';
+    modelPromise = loadEngine()
+      .then((Vosk) => {
+        const saved = readSaved();
+        const list = saved.url ? [saved.url] : MODEL_URLS;
+        status = 'download';
+        return new Promise((resolve, reject) => {
+          const attempt = (index) => {
+            if (index >= list.length) {
+              reject(new Error(lastError || 'model-load-failed'));
+              return;
+            }
+            createModelHandle(Vosk, list[index])
+              .then((handle) => {
+                model = handle;
+                activeUrl = list[index];
+                status = 'ready';
+                writeSaved(true, activeUrl);
+                resolve(handle);
+              })
+              .catch((error) => {
+                lastError = (error && error.message) || String(error);
+                attempt(index + 1);
+              });
+          };
+          attempt(0);
+        });
+      })
+      .catch((error) => {
+        status = 'error';
+        modelPromise = null;
+        throw error;
+      });
+
+    return modelPromise;
+  }
+
+  function forget() {
+    if (model) {
+      try {
+        model.terminate();
+      } catch (_) {
+        /* 已经结束 */
+      }
+    }
+    model = null;
+    modelPromise = null;
+    status = 'idle';
+    writeSaved(false, '');
+  }
+
+  /* ------------------------------------------------------------------ *
+   * 识别会话：麦克风 → 16 kHz 单声道 → Vosk
+   * ------------------------------------------------------------------ */
+
+  function resampleTo16k(input, inputRate) {
+    if (!inputRate || inputRate === SAMPLE_RATE) return input;
+    const ratio = inputRate / SAMPLE_RATE;
+    const length = Math.max(1, Math.floor(input.length / ratio));
+    const output = new Float32Array(length);
+    for (let i = 0; i < length; i += 1) {
+      const from = Math.floor(i * ratio);
+      const to = Math.min(input.length, Math.floor((i + 1) * ratio));
+      let sum = 0;
+      let count = 0;
+      for (let j = from; j < to; j += 1) {
+        sum += input[j];
+        count += 1;
+      }
+      output[i] = count ? sum / count : 0;
+    }
+    return output;
+  }
+
+  /* iOS 上 AudioContext 需要在点击事件里解锁，否则一直是 suspended，
+     麦克风采集不到任何数据。开始按钮点下去时先建好、resume 一次，会话直接复用。 */
+  let sharedCtx = null;
+
+  function unlock() {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    try {
+      if (!sharedCtx) sharedCtx = new AudioCtx();
+      if (sharedCtx.state === 'suspended' && sharedCtx.resume) {
+        sharedCtx.resume().catch(() => {});
+      }
+    } catch (_) {
+      sharedCtx = null;
+    }
+  }
+
+  function createSession(options) {
+    const opts = options || {};
+    const on = (name) => (typeof opts[name] === 'function' ? opts[name] : () => {});
+
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let ctx = null;
+    let ownsCtx = false;
+    let stream = null;
+    let source = null;
+    let node = null;
+    let recognizer = null;
+    let running = false;
+    let starting = false;
+    let paused = false;
+    let closed = false;
+    let silenceTimer = 0;
+    let lastVoiceAt = 0;
+    let lastPartial = '';
+
+    function label(state) {
+      on('onState')(state);
+    }
+
+    function attach(instance) {
+      instance.on('result', (message) => {
+        if (instance !== recognizer || !running || closed) return;
+        const text = message && message.result && message.result.text ? message.result.text : '';
+        lastVoiceAt = performance.now();
+        if (paused) return;
+        if (text) on('onText')(text, true);
+      });
+
+      instance.on('partialresult', (message) => {
+        if (instance !== recognizer || !running || closed || paused) return;
+        const text = message && message.result && message.result.partial ? message.result.partial : '';
+        if (text) {
+          lastVoiceAt = performance.now();
+          if (text !== lastPartial) {
+            lastPartial = text;
+            on('onText')(text, false);
+          }
+        }
+      });
+    }
+
+    function freshRecognizer() {
+      const previous = recognizer;
+      recognizer = null;
+      if (previous) {
+        try {
+          previous.remove();
+        } catch (_) {
+          /* 已经移除 */
+        }
+      }
+      if (!model) return;
+      recognizer = new model.KaldiRecognizer(SAMPLE_RATE);
+      lastPartial = '';
+      attach(recognizer);
+      lastVoiceAt = performance.now();
+    }
+
+    function feed(channel) {
+      if (!recognizer || paused || closed) return;
+      try {
+        recognizer.acceptWaveformFloat(resampleTo16k(channel, ctx ? ctx.sampleRate : SAMPLE_RATE), SAMPLE_RATE);
+      } catch (error) {
+        on('onError')('offline-feed', error);
+      }
+    }
+
+    function teardownAudio() {
+      if (silenceTimer) {
+        clearInterval(silenceTimer);
+        silenceTimer = 0;
+      }
+      if (node) {
+        node.onaudioprocess = null;
+        try {
+          node.disconnect();
+        } catch (_) {
+          /* 已经断开 */
+        }
+        node = null;
+      }
+      if (source) {
+        try {
+          source.disconnect();
+        } catch (_) {
+          /* 已经断开 */
+        }
+        source = null;
+      }
+      if (stream) {
+        stream.getTracks().forEach((track) => {
+          try {
+            track.stop();
+          } catch (_) {
+            /* 已经停止 */
+          }
+        });
+        stream = null;
+      }
+      if (ctx && ownsCtx) {
+        try {
+          ctx.close();
+        } catch (_) {
+          /* 已经关闭 */
+        }
+        if (ctx === sharedCtx) {
+          sharedCtx.__closed = true;
+          sharedCtx = null;
+        }
+      }
+      ctx = null;
+    }
+
+    function start() {
+      if (running || starting) return Promise.resolve();
+      starting = true;
+      closed = false;
+      paused = false;
+      label('loading');
+      on('onHint')('正在准备离线语音，第一次会慢一点…');
+
+      return ensureModel()
+        .then(() => {
+          if (closed) return null;
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error('mic-unsupported');
+          }
+          return navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              channelCount: 1,
+            },
+            video: false,
+          });
+        })
+        .then((mediaStream) => {
+          if (!mediaStream) return;
+          stream = mediaStream;
+          if (sharedCtx && !sharedCtx.__closed) {
+            ctx = sharedCtx;
+            ownsCtx = false;
+          } else {
+            ctx = new AudioCtx();
+            ownsCtx = true;
+          }
+          if (ctx.state === 'suspended' && ctx.resume) {
+            return ctx.resume().then(() => mediaStream, () => mediaStream);
+          }
+          return mediaStream;
+        })
+        .then((mediaStream) => {
+          if (!mediaStream || closed) {
+            starting = false;
+            return;
+          }
+          source = ctx.createMediaStreamSource(stream);
+          node = ctx.createScriptProcessor(4096, 1, 1);
+          node.onaudioprocess = (event) => {
+            feed(event.inputBuffer.getChannelData(0));
+          };
+          source.connect(node);
+          node.connect(ctx.destination);
+
+          running = true;
+          freshRecognizer();
+          lastVoiceAt = performance.now();
+          silenceTimer = setInterval(() => {
+            if (!running || paused || closed) return;
+            if (performance.now() - lastVoiceAt > SILENCE_MS) {
+              lastVoiceAt = performance.now();
+              on('onSilence')();
+            }
+          }, 1500);
+          starting = false;
+          label('listening');
+          on('onHint')(offlineHint());
+          on('onReady')();
+        })
+        .catch((error) => {
+          starting = false;
+          teardownAudio();
+          running = false;
+          const code = error && error.name ? error.name : '';
+          if (code === 'NotAllowedError' || code === 'SecurityError') on('onError')('mic-denied', error);
+          else if (code === 'NotFoundError' || code === 'DevicesNotFoundError') on('onError')('mic-missing', error);
+          else on('onError')('offline-start', error);
+        });
+    }
+
+    function pause() {
+      paused = true;
+      if (recognizer) {
+        try {
+          recognizer.retrieveFinalResult();
+        } catch (_) {
+          /* 已经结束 */
+        }
+      }
+      label('paused');
+    }
+
+    function resume() {
+      if (!running || closed) return;
+      paused = false;
+      lastVoiceAt = performance.now();
+      label('listening');
+    }
+
+    function stop() {
+      running = false;
+      starting = false;
+      paused = false;
+      closed = true;
+      teardownAudio();
+      if (recognizer) {
+        try {
+          recognizer.remove();
+        } catch (_) {
+          /* 已经移除 */
+        }
+        recognizer = null;
+      }
+      label('idle');
+    }
+
+    function reset() {
+      if (!running || closed) return;
+      freshRecognizer();
+    }
+
+    return {
+      start,
+      pause,
+      resume,
+      stop,
+      reset,
+      get running() {
+        return running;
+      },
+      get starting() {
+        return starting;
+      },
+      get paused() {
+        return paused;
+      },
+    };
+  }
+
+  function offlineHint() {
+    return '离线识别中，说完答案会自动进入下一题';
+  }
+
+  window.KousuanOffline = {
+    supported,
+    state() {
+      if (!supported()) return 'unsupported';
+      return readSaved().ready ? 'ready' : 'idle';
+    },
+    status() {
+      return status;
+    },
+    sizeHint() {
+      return sizeBytes;
+    },
+    probeSize,
+    preload: ensureModel,
+    download,
+    cancel,
+    forget,
+    createSession,
+    unlock,
+    modelUrls: MODEL_URLS.slice(),
+  };
+})();
+  </script>
+  <script>
 (() => {
   'use strict';
 
@@ -860,7 +1839,7 @@ input:focus-visible {
    * 对不上就带参数重新取一次页面。
    * ------------------------------------------------------------------ */
 
-  const REQUIRED_IDS = ['setup', 'practice', 'results', 'answer-form', 'question', 'voice-button'];
+  const REQUIRED_IDS = ['welcome', 'setup', 'practice', 'results', 'answer-form', 'question', 'voice-button'];
   const domMatches = REQUIRED_IDS.every((id) => document.getElementById(id));
   if (!domMatches) {
     if (location.search.indexOf('fresh=') === -1) {
@@ -893,10 +1872,26 @@ input:focus-visible {
 
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   const supportsSpeech = Boolean(Recognition);
-  const inFrame = window.self !== window.top;
-  const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
-  const defaults = { mode: 'type', level: 'two', count: 10 };
+  /* 离线识别：vendor/vosk-browser.js + models/ 里的中文小模型（见 src/offline-asr.js） */
+  const Offline = window.KousuanOffline;
+  const supportsOffline = Boolean(Offline && Offline.supported());
+  const supportsVoice = supportsSpeech || supportsOffline;
+
+  const inFrame = window.self !== window.top;
+
+  /* 个别旧 WebView 没有 matchMedia，取不到就当没有精确指针（不自动聚焦） */
+  function mediaMatches(query) {
+    try {
+      return typeof window.matchMedia === 'function' && window.matchMedia(query).matches;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  const finePointer = mediaMatches('(hover: hover) and (pointer: fine)');
+
+  const defaults = { mode: 'type', level: 'two', count: 10, engine: '', packPrompt: true };
   let prefs = { ...defaults };
   let best = {};
 
@@ -925,7 +1920,9 @@ input:focus-visible {
   if (['type', 'voice'].indexOf(prefs.mode) === -1) prefs.mode = defaults.mode;
   if (['two', 'mixed', 'three'].indexOf(prefs.level) === -1) prefs.level = defaults.level;
   if ([0, 10, 20, 30].indexOf(prefs.count) === -1) prefs.count = defaults.count;
-  if (!supportsSpeech) prefs.mode = 'type';
+  if (['offline', 'online'].indexOf(prefs.engine) === -1) prefs.engine = defaults.engine;
+  if (typeof prefs.packPrompt !== 'boolean') prefs.packPrompt = defaults.packPrompt;
+  if (!supportsVoice) prefs.mode = 'type';
 
   function persist() {
     try {
@@ -955,8 +1952,124 @@ input:focus-visible {
       setClass(button, 'selected', on);
       button.setAttribute('aria-pressed', String(on));
     });
-    el('voice-tip').hidden = !(prefs.mode === 'voice' && supportsSpeech);
+    el('voice-tip').hidden = !(prefs.mode === 'voice' && supportsVoice);
+    syncVoiceUI();
   }
+
+  /* ------------------------------------------------------------------ *
+   * 离线语音包 / 识别引擎
+   * ------------------------------------------------------------------ */
+
+  let downloading = false;
+  let downloadTimer = 0;
+  let downloadStartedAt = 0;
+  let downloadProgressText = '';
+
+  function formatMB(bytes) {
+    if (!bytes) return '';
+    return `${Math.max(1, Math.round(bytes / (1024 * 1024)))} MB`;
+  }
+
+  /* 没有明确选择时：装过离线包就用离线（手机最稳），否则用浏览器自带 */
+  function autoEngine() {
+    if (supportsOffline && Offline.state() === 'ready') return 'offline';
+    if (supportsSpeech) return 'online';
+    return supportsOffline ? 'offline' : 'online';
+  }
+
+  function engineNow() {
+    if (!supportsVoice) return 'none';
+    const wanted = prefs.engine || autoEngine();
+    if (wanted === 'offline' && supportsOffline) return 'offline';
+    if (wanted === 'online' && supportsSpeech) return 'online';
+    return supportsSpeech ? 'online' : (supportsOffline ? 'offline' : 'none');
+  }
+
+  function offlineReady() {
+    return supportsOffline && Offline.state() === 'ready';
+  }
+
+  function syncVoiceUI() {
+    const engine = engineNow();
+
+    const choice = el('engine-choice');
+    const showChoice = supportsOffline && supportsSpeech;
+    choice.hidden = !showChoice;
+    el('engine-offline-note').textContent = offlineReady()
+      ? (formatMB(Offline.sizeHint()) || '已下载')
+      : '未下载';
+    el('engine-online-note').textContent = '无需下载';
+
+    document.querySelectorAll('[data-engine]').forEach((button) => {
+      const value = button.dataset.engine;
+      const on = value === engine;
+      setClass(button, 'selected', on);
+      button.setAttribute('aria-pressed', String(on));
+      button.disabled = (value === 'offline' && !supportsOffline)
+        || (value === 'online' && !supportsSpeech);
+    });
+
+    const card = document.querySelector('[data-mode="voice"]');
+    if (card) {
+      const copy = card.querySelector('.mode-copy small');
+      if (!supportsVoice) copy.textContent = '此浏览器不支持';
+      else if (engine === 'offline') copy.textContent = offlineReady() ? '本机识别，断网可用' : '需先下载语音包';
+      else copy.textContent = '看题后直接说出答案';
+    }
+
+    const note = el('voice-note');
+    if (!supportsVoice) {
+      note.textContent = '这个浏览器既没有网页语音识别，也不支持离线语音包，先用打字作答吧。';
+      note.hidden = false;
+    } else if (!supportsSpeech) {
+      note.textContent = offlineReady()
+        ? '这个浏览器不支持网页语音识别，已改用本机离线识别。'
+        : '这个浏览器不支持网页语音识别。下载离线语音包后，手机也能说话答题。';
+      note.hidden = false;
+    } else if (!supportsOffline) {
+      note.textContent = '这个浏览器不支持离线语音包，只能用浏览器自带的在线识别。';
+      note.hidden = false;
+    } else {
+      note.hidden = true;
+    }
+
+    const row = el('pack-row');
+    row.hidden = !supportsOffline;
+    const size = Offline && Offline.sizeHint ? Offline.sizeHint() : 0;
+    if (downloadProgressText) {
+      el('pack-status').textContent = downloadProgressText;
+      el('pack-action').textContent = '下载中…';
+      el('pack-action').disabled = true;
+    } else if (offlineReady()) {
+      el('pack-status').textContent = formatMB(size) ? `已下载（${formatMB(size)}）` : '已下载';
+      el('pack-action').textContent = '已装好';
+      el('pack-action').disabled = true;
+    } else {
+      el('pack-status').textContent = '还没下载，下载后断网也能说话答题';
+      el('pack-action').textContent = '下载';
+      el('pack-action').disabled = false;
+    }
+
+    el('voice-tip').hidden = !(prefs.mode === 'voice' && supportsVoice);
+    if (prefs.mode === 'voice' && supportsVoice) {
+      el('voice-tip').textContent = engine === 'offline'
+        ? (offlineReady()
+          ? '开始后请允许麦克风，声音在本机识别，不联网也能用。'
+          : '开始后会先下载离线语音包（约 42 MB），之后就能断网使用。')
+        : '开始后请允许麦克风，说完答案会自动进入下一题。';
+    }
+
+    el('offline-badge').hidden = engine !== 'offline' || view !== 'practice';
+  }
+
+  document.querySelectorAll('[data-engine]').forEach((button) => {
+    button.addEventListener('click', () => {
+      if (button.disabled) return;
+      prefs.engine = button.dataset.engine;
+      persist();
+      syncVoiceUI();
+    });
+  });
 
   document.querySelectorAll('[data-mode]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -983,18 +2096,140 @@ input:focus-visible {
     });
   });
 
-  if (!supportsSpeech) {
+  if (!supportsVoice) {
     const voiceCard = document.querySelector('[data-mode="voice"]');
     if (voiceCard) {
       voiceCard.disabled = true;
       voiceCard.setAttribute('aria-describedby', 'voice-note');
-      voiceCard.querySelector('.mode-copy small').textContent = '此浏览器不支持';
     }
-    el('voice-note').hidden = false;
   }
 
-  el('start-button').addEventListener('click', startSession);
-  el('again-button').addEventListener('click', startSession);
+  /* 下载离线语音包：欢迎页和设置页共用一套进度显示 */
+  function setPackStage(text, hidden) {
+    el('welcome-progress').hidden = Boolean(hidden);
+    el('welcome-stage').textContent = text || '';
+  }
+
+  /* 下载和解压都在识别引擎的 Worker 里跑，拿不到真实百分比，
+     就别编数字：显示已用时间 + 不确定进度条 */
+  function setPackBusy(busy) {
+    const track = el('welcome-fill').parentElement;
+    setClass(track, 'is-indeterminate', busy);
+  }
+
+  function packSizeText() {
+    const size = Offline && Offline.sizeHint ? Offline.sizeHint() : 0;
+    return size ? `约 ${formatMB(size)}` : '约 42 MB';
+  }
+
+  function startPackDownload(fromWelcome) {
+    if (!supportsOffline || downloading) return;
+    if (fromWelcome) prefs.packPrompt = false;
+    downloading = true;
+    downloadStartedAt = performance.now();
+    el('welcome-download').disabled = true;
+    el('welcome-skip').hidden = true;
+    el('welcome-cancel').hidden = false;
+    setPackStage(`正在加载识别引擎，接着下载语音包（${packSizeText()}）…`, false);
+    setPackBusy(true);
+    syncVoiceUI();
+    persist();
+
+    let lastPhase = '';
+    clearInterval(downloadTimer);
+    downloadTimer = setInterval(() => {
+      const seconds = Math.round((performance.now() - downloadStartedAt) / 1000);
+      const nextPhase = Offline.status();
+      if (nextPhase !== lastPhase) lastPhase = nextPhase;
+      setPackStage(
+        `${nextPhase === 'engine' ? '正在加载识别引擎' : '正在下载语音包'}（${packSizeText()}）… `
+        + `已用 ${seconds} 秒，下载和准备期间请让页面留在前台`,
+        false
+      );
+      downloadProgressText = `下载中 · ${seconds}s`;
+      syncVoiceUI();
+    }, 1000);
+
+    Offline.download()
+      .then(() => {
+        clearInterval(downloadTimer);
+        downloading = false;
+        downloadProgressText = '';
+        setPackBusy(false);
+        el('welcome-fill').style.width = '100%';
+        setPackStage('离线语音包已装好，现在断网也能说话答题。', false);
+        prefs.engine = 'offline';
+        persist();
+        syncVoiceUI();
+        setTimeout(() => {
+          el('welcome-cancel').hidden = true;
+          if (view === 'welcome') showView('setup');
+        }, 1200);
+      })
+      .catch((error) => {
+        clearInterval(downloadTimer);
+        downloading = false;
+        downloadProgressText = '';
+        setPackBusy(false);
+        const cancelled = error && error.message === 'cancelled';
+        setPackStage(
+          cancelled
+            ? '已取消下载，需要时可以再点一次。'
+            : '下载没成功。可能是网络被拦住了，换个网络再试，或者先用打字作答。',
+          false
+        );
+        el('welcome-cancel').hidden = true;
+        el('welcome-skip').hidden = false;
+        el('welcome-download').disabled = false;
+        el('welcome-download').querySelector('span').textContent = '重新下载离线语音包';
+        syncVoiceUI();
+      });
+  }
+
+  el('welcome-download').addEventListener('click', () => startPackDownload(true));
+  el('welcome-cancel').addEventListener('click', () => {
+    if (Offline) Offline.cancel();
+  });
+  el('welcome-skip').addEventListener('click', () => {
+    prefs.packPrompt = false;
+    if (prefs.mode === 'voice' && engineNow() === 'offline' && !offlineReady()) {
+      /* 用户不想下载：退回浏览器自带识别（如果支持），否则用打字 */
+      prefs.mode = supportsSpeech ? 'voice' : 'type';
+      if (supportsSpeech) prefs.engine = 'online';
+    }
+    persist();
+    syncSetup();
+    el('welcome-skip').textContent = '先用打字作答，稍后再下载';
+    showView('setup');
+  });
+  el('pack-action').addEventListener('click', () => {
+    if (downloading || offlineReady()) return;
+    startPackDownload(false);
+  });
+
+  if (supportsOffline) {
+    Offline.probeSize(Offline.modelUrls[0]).then(() => syncVoiceUI()).catch(() => {});
+  }
+
+  function beginOrAsk() {
+    /* 选了离线识别但语音包还没装：先去装，装完再开始，别让练习页空等 */
+    if (prefs.mode === 'voice' && engineNow() === 'offline' && !offlineReady()) {
+      el('welcome-stage').textContent = '说话答题要先装一次离线语音包，装好后就能断网使用。';
+      el('welcome-progress').hidden = false;
+      el('welcome-fill').style.width = '0%';
+      el('welcome-skip').textContent = '先不下载，改用打字作答';
+      showView('welcome');
+      return;
+    }
+    startSession();
+  }
+
+  el('start-button').addEventListener('click', () => {
+    /* 在点击里解锁音频，手机上离线识别才采得到声音 */
+    if (supportsOffline) Offline.unlock();
+    beginOrAsk();
+  });
+  el('again-button').addEventListener('click', beginOrAsk);
 
   el('settings-button').addEventListener('click', () => {
     syncSetup();
@@ -1094,14 +2329,16 @@ input:focus-visible {
     applyModeLayout();
     nextQuestion();
 
-    if (prefs.mode === 'voice' && supportsSpeech) startVoice();
+    if (prefs.mode === 'voice' && supportsVoice) startVoice();
   }
 
   function applyModeLayout() {
     const isVoice = prefs.mode === 'voice';
     el('answer-form').hidden = isVoice;
     el('voice-area').hidden = !isVoice;
+    el('answer-dock').hidden = isVoice;
     el('practice').dataset.mode = prefs.mode;
+    el('offline-badge').hidden = !(isVoice && engineNow() === 'offline' && view === 'practice');
   }
 
   function nextQuestion() {
@@ -1310,9 +2547,11 @@ input:focus-visible {
 
   function showView(next) {
     view = next;
+    el('welcome').hidden = next !== 'welcome';
     el('setup').hidden = next !== 'setup';
     el('practice').hidden = next !== 'practice';
     el('results').hidden = next !== 'results';
+    el('offline-badge').hidden = next !== 'practice' || engineNow() !== 'offline';
     window.scrollTo(0, 0);
   }
 
@@ -1489,6 +2728,19 @@ input:focus-visible {
   let hasStarted = false;
   let silenceCount = 0;
 
+  /* 两个引擎拿到最终文本后都走这里：解析数字 → 判题 */
+  function handleHeard(text) {
+    if (locked || view !== 'practice' || !session) return;
+    silenceCount = 0;
+    const value = parseSpokenNumber(text);
+    if (value === null) {
+      setFeedback('没听清，再说一次', 'bad');
+      return;
+    }
+    setFeedback('');
+    submit(value);
+  }
+
   function createRecognition() {
     const instance = new Recognition();
     instance.lang = 'zh-CN';
@@ -1599,7 +2851,96 @@ input:focus-visible {
     }, delay);
   }
 
+  /* ------------------------------------------------------------------ *
+   * 离线识别（Vosk，在本机跑）
+   * ------------------------------------------------------------------ */
+
+  let offlineSession = null;
+
+  function startOfflineVoice() {
+    /* 只在这次练习还没启动过会话时重建，切标签页回来要走 rescue 路径 */
+    showView('practice');
+    wantListen = true;
+    paused = false;
+    micProblem = null;
+    silenceCount = 0;
+    el('heard-text').textContent = '';
+    el('voice-actions').hidden = true;
+    el('new-tab').hidden = !inFrame;
+    el('voice-hint').textContent = '正在准备离线语音…';
+    el('offline-badge').hidden = false;
+    setFeedback('看着题目，直接说出答案');
+    setVoiceState('loading');
+
+    if (offlineSession && (offlineSession.running || offlineSession.starting)) {
+      setVoiceState('listening');
+      return;
+    }
+
+    if (!offlineSession) {
+      offlineSession = Offline.createSession({
+        onState(state) {
+          if (state === 'listening') {
+            setVoiceState('listening');
+            el('offline-badge').hidden = false;
+          } else if (state === 'loading') {
+            setVoiceState('loading');
+          } else if (state === 'paused') {
+            setVoiceState(wantListen ? 'thinking' : 'idle');
+          } else {
+            setVoiceState('idle');
+          }
+        },
+        onHint(text) {
+          el('voice-hint').textContent = text;
+        },
+        onText(text, isFinal) {
+          el('heard-text').textContent = text;
+          if (!isFinal) return;
+          handleHeard(text);
+        },
+        onSilence() {
+          silenceCount += 1;
+          if (silenceCount >= 3) pausePrompt('没听到声音，点麦克风继续', '继续收音');
+          else setFeedback('没听到声音，再说一次', 'bad');
+        },
+        onReady() {
+          silenceCount = 0;
+        },
+        onError(kind, error) {
+          if (kind === 'mic-denied') {
+            failVoice('麦克风没有打开。允许权限后重试，或改用打字作答。');
+          } else if (kind === 'mic-missing') {
+            failVoice('没有找到可用的麦克风。');
+          } else if (kind === 'offline-start') {
+            failVoice('离线语音没能启动。可以点「重新打开麦克风」，或者改用打字作答。');
+            el('voice-hint').textContent = `离线语音没能启动（${(error && error.message) || '未知原因'}）。`;
+          } else {
+            setFeedback('识别出了点问题，再说一次', 'bad');
+          }
+        },
+      });
+    }
+
+    offlineSession.start();
+  }
+
+  function stopOfflineVoice() {
+    if (offlineSession) {
+      offlineSession.stop();
+      offlineSession = null;
+    }
+  }
+
+  /* ------------------------------------------------------------------ *
+   * 语音控制：两个引擎共用一套状态
+   * ------------------------------------------------------------------ */
+
   function startVoice() {
+    if (engineNow() === 'offline') {
+      startOfflineVoice();
+      return;
+    }
     if (!Recognition) return;
     wantListen = true;
     paused = false;
@@ -1609,6 +2950,7 @@ input:focus-visible {
     el('heard-text').textContent = '';
     el('voice-actions').hidden = true;
     el('new-tab').hidden = !inFrame;
+    el('offline-badge').hidden = true;
     el('voice-hint').textContent = '说完答案会自动进入下一题，点麦克风可暂停';
     el('feedback').className = 'feedback';
     setFeedback('看着题目，直接说出答案');
@@ -1619,6 +2961,11 @@ input:focus-visible {
   function pauseVoice() {
     paused = true;
     clearTimeout(restartTimer);
+    if (engineNow() === 'offline') {
+      if (offlineSession) offlineSession.pause();
+      setVoiceState(wantListen ? 'thinking' : 'idle');
+      return;
+    }
     if (recognition && isListening) {
       try {
         recognition.stop();
@@ -1630,9 +2977,19 @@ input:focus-visible {
   }
 
   function resumeVoice() {
-    if (!Recognition || !wantListen || micProblem) return;
+    if (!wantListen || micProblem) return;
     paused = false;
     el('heard-text').textContent = '';
+    if (engineNow() === 'offline') {
+      if (offlineSession) {
+        offlineSession.resume();
+        offlineSession.reset();
+      } else {
+        startOfflineVoice();
+      }
+      return;
+    }
+    if (!Recognition) return;
     listen();
   }
 
@@ -1648,7 +3005,9 @@ input:focus-visible {
         /* 已经停止 */
       }
     }
+    stopOfflineVoice();
     isListening = false;
+    el('offline-badge').hidden = true;
     setVoiceState('idle');
   }
 
@@ -1664,6 +3023,7 @@ input:focus-visible {
         /* 已经停止 */
       }
     }
+    if (offlineSession) offlineSession.pause();
     isListening = false;
     setVoiceState('paused');
     setVoiceLabel('点一下继续');
@@ -1695,6 +3055,7 @@ input:focus-visible {
   }
 
   const VOICE_LABELS = {
+    loading: '正在准备…',
     listening: '正在聆听…',
     thinking: '已听到',
     paused: '点一下继续',
@@ -1704,6 +3065,7 @@ input:focus-visible {
 
   function setVoiceState(state) {
     const button = el('voice-button');
+    setClass(button, 'is-loading', state === 'loading');
     setClass(button, 'is-listening', state === 'listening');
     setClass(button, 'is-thinking', state === 'thinking');
     setClass(button, 'is-paused', state === 'paused');
@@ -1727,7 +3089,8 @@ input:focus-visible {
       el('voice-actions').hidden = true;
       el('voice-hint').textContent = '说完答案会自动进入下一题，点麦克风可暂停';
       setVoiceState('listening');
-      listen();
+      if (engineNow() === 'offline') startOfflineVoice();
+      else listen();
       return;
     }
 
@@ -1752,7 +3115,12 @@ input:focus-visible {
     el('voice-actions').hidden = true;
     el('voice-hint').textContent = '说完答案会自动进入下一题，点麦克风可暂停';
     setVoiceState('listening');
-    listen();
+    if (engineNow() === 'offline') {
+      stopOfflineVoice();
+      startOfflineVoice();
+    } else {
+      listen();
+    }
   });
 
   el('new-tab').addEventListener('click', () => {
@@ -1774,6 +3142,11 @@ input:focus-visible {
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       if (view === 'practice') awaySince = performance.now();
+      if (offlineSession) {
+        /* 手机切走时先放掉麦克风（状态栏那个录音点会消失），回来再重开 */
+        paused = true;
+        stopOfflineVoice();
+      }
       if (isListening) {
         paused = true;
         try {
@@ -1791,11 +3164,23 @@ input:focus-visible {
     }
     if (view === 'practice' && prefs.mode === 'voice' && wantListen && !locked && !micProblem) {
       paused = false;
-      listen();
+      if (engineNow() === 'offline') rescueOfflineVoice();
+      else listen();
     }
   });
 
+  /* 手机切回来（或用户点了继续）时，离线会话可能已经被系统收掉了，重建一次 */
+  function rescueOfflineVoice() {
+    if (offlineSession && offlineSession.running) {
+      offlineSession.resume();
+      return;
+    }
+    stopOfflineVoice();
+    startOfflineVoice();
+  }
+
   window.addEventListener('beforeunload', () => {
+    stopOfflineVoice();
     if (recognition) {
       try {
         recognition.abort();
@@ -1808,6 +3193,15 @@ input:focus-visible {
   /* ------------------------------------------------------------------ */
 
   syncSetup();
+
+  /* 第一次打开（或语音包还没装）先停在语音包这一步 */
+  if (supportsOffline && !offlineReady() && prefs.packPrompt) {
+    showView('welcome');
+    Offline.probeSize(Offline.modelUrls[0]).then(() => syncVoiceUI()).catch(() => {});
+  } else {
+    showView('setup');
+  }
+
   window.kousuanReady = true;
 })();
   </script>
@@ -1841,6 +3235,24 @@ input:focus-visible {
         if (reported) return;
         reported = true;
         strip(text);
+      }
+
+      /* 微信 / QQ 内置浏览器里，网页语音识别和中途下载 42 MB 都不稳，
+         先把「换个真正的浏览器打开」这件事说清楚 */
+      try {
+        var ua = navigator.userAgent || '';
+        var inWechat = /MicroMessenger|QQ\//i.test(ua);
+        var embedded = (window.self !== window.top) || inWechat;
+        if (embedded) {
+          var tip = document.getElementById('embed-tip');
+          tip.hidden = false;
+          tip.querySelector('a').href = location.href;
+          if (inWechat) {
+            tip.firstChild.nodeValue = '现在是在微信 / QQ 里打开，语音识别和语音包下载容易被拦。建议点右上角「···」选择在浏览器打开。';
+          }
+        }
+      } catch (_) {
+        /* 提示不出来不影响答题 */
       }
 
       window.onerror = function (message, source, line) {

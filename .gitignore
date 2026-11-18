@@ -1,5 +1,11 @@
 # 本地测试依赖与截图（不进仓库）
 .test/
 
+# 依赖
+node_modules/
+
+# 语音模型下载缓存（只用 tools/fetch_model.py 重新生成 tar.gz）
+models/*.zip
+
 # 系统文件
 .DS_Store
