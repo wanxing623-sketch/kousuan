@@ -1030,3 +1030,45 @@ input:focus-visible {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* ---------- about / licenses ---------- */
+
+.about-panel {
+  margin: 18px auto 0;
+  max-width: 680px;
+  padding: 0 4px;
+  color: var(--muted-2);
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.about-panel summary {
+  padding: 10px 2px;
+  min-height: 44px;
+  box-sizing: border-box;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+}
+
+.about-panel summary::-webkit-details-marker { display: none; }
+
+.about-panel summary::before {
+  content: "＋";
+  margin-right: 6px;
+  color: var(--muted-2);
+}
+
+.about-panel[open] summary::before { content: "−"; }
+
+.about-body { padding: 0 2px 8px; }
+
+.about-body p + p { margin-top: 8px; }
+
+.about-body a {
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.about-meta { color: var(--muted-2); }

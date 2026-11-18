@@ -258,7 +258,12 @@
       })
       .catch((error) => {
         status = 'error';
+        lastError = (error && error.message) || String(error);
         modelPromise = null;
+        /* 标记是「已装好」但这次装不起来：缓存坏了或浏览器清过数据，
+           作废标记，界面会提示重新下载，不会一直假装可用 */
+        const saved = readSaved();
+        if (saved.ready) writeSaved(false, saved.url);
         throw error;
       });
 

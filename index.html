@@ -1045,6 +1045,48 @@ input:focus-visible {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* ---------- about / licenses ---------- */
+
+.about-panel {
+  margin: 18px auto 0;
+  max-width: 680px;
+  padding: 0 4px;
+  color: var(--muted-2);
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.about-panel summary {
+  padding: 10px 2px;
+  min-height: 44px;
+  box-sizing: border-box;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+}
+
+.about-panel summary::-webkit-details-marker { display: none; }
+
+.about-panel summary::before {
+  content: "＋";
+  margin-right: 6px;
+  color: var(--muted-2);
+}
+
+.about-panel[open] summary::before { content: "−"; }
+
+.about-body { padding: 0 2px 8px; }
+
+.about-body p + p { margin-top: 8px; }
+
+.about-body a {
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.about-meta { color: var(--muted-2); }
   </style>
 </head>
 <body>
@@ -1224,6 +1266,21 @@ input:focus-visible {
       </button>
       <button id="settings-button" class="text-button settings-link" type="button">返回设置</button>
     </section>
+
+    <details class="about-panel">
+      <summary>关于与第三方组件</summary>
+      <div class="about-body">
+        <p>
+          语音识别用开源项目
+          <a href="https://github.com/ccoreilly/vosk-browser" target="_blank" rel="noopener noreferrer">vosk-browser</a>
+          （Vosk 的 WebAssembly 版）和中文模型
+          <a href="https://alphacephei.com/vosk/models" target="_blank" rel="noopener noreferrer">vosk-model-small-cn-0.22</a>，
+          都是 Apache-2.0 协议。模型只在你点「下载」时请求一次，之后存在浏览器本地。
+        </p>
+        <p>设置和成绩只存在这台设备的浏览器里，不联网、不需要账号。</p>
+        <p class="about-meta">速算练习 · 打开就能用的口算页</p>
+      </div>
+    </details>
   </main>
 
   <script>
@@ -1487,7 +1544,12 @@ input:focus-visible {
       })
       .catch((error) => {
         status = 'error';
+        lastError = (error && error.message) || String(error);
         modelPromise = null;
+        /* 标记是「已装好」但这次装不起来：缓存坏了或浏览器清过数据，
+           作废标记，界面会提示重新下载，不会一直假装可用 */
+        const saved = readSaved();
+        if (saved.ready) writeSaved(false, saved.url);
         throw error;
       });
 
@@ -2038,8 +2100,8 @@ input:focus-visible {
     const size = Offline && Offline.sizeHint ? Offline.sizeHint() : 0;
     if (downloadProgressText) {
       el('pack-status').textContent = downloadProgressText;
-      el('pack-action').textContent = '下载中…';
-      el('pack-action').disabled = true;
+      el('pack-action').textContent = '取消下载';
+      el('pack-action').disabled = false;
     } else if (offlineReady()) {
       el('pack-status').textContent = formatMB(size) ? `已下载（${formatMB(size)}）` : '已下载';
       el('pack-action').textContent = '已装好';
@@ -2065,6 +2127,7 @@ input:focus-visible {
   document.querySelectorAll('[data-engine]').forEach((button) => {
     button.addEventListener('click', () => {
       if (button.disabled) return;
+      offlineFallbackTried = false;
       prefs.engine = button.dataset.engine;
       persist();
       syncVoiceUI();
@@ -2130,6 +2193,7 @@ input:focus-visible {
     el('welcome-download').disabled = true;
     el('welcome-skip').hidden = true;
     el('welcome-cancel').hidden = false;
+    downloadProgressText = '准备中…';
     setPackStage(`正在加载识别引擎，接着下载语音包（${packSizeText()}）…`, false);
     setPackBusy(true);
     syncVoiceUI();
@@ -2161,6 +2225,7 @@ input:focus-visible {
         prefs.engine = 'offline';
         persist();
         syncVoiceUI();
+        el('pack-action').textContent = '已装好';
         setTimeout(() => {
           el('welcome-cancel').hidden = true;
           if (view === 'welcome') showView('setup');
@@ -2183,6 +2248,9 @@ input:focus-visible {
         el('welcome-download').disabled = false;
         el('welcome-download').querySelector('span').textContent = '重新下载离线语音包';
         syncVoiceUI();
+        /* 中途取消不算失败：设置页还是那句「下载」 */
+        if (cancelled) el('pack-action').textContent = '下载';
+        else el('pack-action').textContent = '重试';
       });
   }
 
@@ -2203,7 +2271,11 @@ input:focus-visible {
     showView('setup');
   });
   el('pack-action').addEventListener('click', () => {
-    if (downloading || offlineReady()) return;
+    if (downloading) {
+      if (Offline) Offline.cancel();
+      return;
+    }
+    if (offlineReady()) return;
     startPackDownload(false);
   });
 
@@ -2312,6 +2384,7 @@ input:focus-visible {
 
   function startSession() {
     clearTimeout(advanceTimer);
+    offlineFallbackTried = false;
     locked = false;
     awayMs = 0;
     awaySince = document.hidden ? performance.now() : 0;
@@ -2856,6 +2929,7 @@ input:focus-visible {
    * ------------------------------------------------------------------ */
 
   let offlineSession = null;
+  let offlineFallbackTried = false;
 
   function startOfflineVoice() {
     /* 只在这次练习还没启动过会话时重建，切标签页回来要走 rescue 路径 */
@@ -2913,8 +2987,22 @@ input:focus-visible {
           } else if (kind === 'mic-missing') {
             failVoice('没有找到可用的麦克风。');
           } else if (kind === 'offline-start') {
+            /* 离线包坏了/缓存被清了，但浏览器自带识别可用：当场换过去，别让这组练习废掉 */
+            if (supportsSpeech && !offlineFallbackTried) {
+              offlineFallbackTried = true;
+              stopOfflineVoice();
+              prefs.engine = 'online';
+              persist();
+              syncVoiceUI();
+              startVoice();
+              setFeedback('离线语音没启动起来，已改用浏览器识别', '');
+              return;
+            }
             failVoice('离线语音没能启动。可以点「重新打开麦克风」，或者改用打字作答。');
             el('voice-hint').textContent = `离线语音没能启动（${(error && error.message) || '未知原因'}）。`;
+            if (offlineReady() === false) {
+              el('voice-hint').textContent += '离线语音包可能没装好，回设置页可以重新下载。';
+            }
           } else {
             setFeedback('识别出了点问题，再说一次', 'bad');
           }

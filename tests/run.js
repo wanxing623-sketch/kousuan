@@ -51,6 +51,34 @@ async function testAsync(name, fn) {
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/* 浏览器自带识别的最小替身：只记录 start/abort 调用，用来判断有没有换引擎 */
+function makeSpeechRecognition(calls) {
+  return class FakeSpeechRecognition {
+    constructor() {
+      this.lang = '';
+      this.continuous = false;
+      this.interimResults = false;
+      this.maxAlternatives = 1;
+      this.calls = calls;
+    }
+
+    start() {
+      calls.starts += 1;
+      if (this.onstart) this.onstart();
+    }
+
+    abort() {
+      calls.aborts += 1;
+      if (this.onend) this.onend();
+    }
+
+    stop() {
+      calls.stops += 1;
+      if (this.onend) this.onend();
+    }
+  };
+}
+
 /* ------------------------------------------------------------------ *
  * 测试环境：假麦克风 + 假 Vosk
  * ------------------------------------------------------------------ */
@@ -81,6 +109,7 @@ function installEnvironment(window, options = {}) {
     }
 
     createScriptProcessor() {
+      if (options.brokenProcessor) throw new Error('processor unavailable');
       const node = {
         onaudioprocess: null,
         connect() {
@@ -215,6 +244,12 @@ function loadPage(options = {}) {
     url: 'https://example.test/kousuan/',
     virtualConsole,
     beforeParse(window) {
+      if (options.savedPack) {
+        window.localStorage.setItem('kousuan:voicepack:v1', JSON.stringify({
+          ready: true,
+          url: 'models/vosk-model-small-cn.tar.gz',
+        }));
+      }
       window.__state = installEnvironment(window, options);
       window.matchMedia = window.matchMedia || (() => ({
         matches: false,
@@ -454,6 +489,71 @@ function loadPage(options = {}) {
     dom.window.close();
   });
 
+  /* 6b. 设置页里取消下载 -------------------------------------------- */
+  await testAsync('设置页下载中，按钮变成「取消」，点了能停下来', async () => {
+    const page = loadPage();
+    await wait(30);
+    const d = page.window.document;
+    d.getElementById('welcome-skip').click();
+    d.getElementById('pack-action').click();
+    assert.strictEqual(d.getElementById('pack-action').textContent, '取消下载');
+    assert.strictEqual(d.getElementById('pack-action').disabled, false);
+    assert.strictEqual(d.getElementById('pack-status').textContent, '准备中…');
+
+    d.getElementById('pack-action').click();
+    await wait(100);
+    assert.strictEqual(page.window.KousuanOffline.state(), 'idle');
+    assert.strictEqual(d.getElementById('pack-action').textContent, '下载');
+    assert.ok(d.getElementById('pack-status').textContent.indexOf('还没下载') === 0);
+    page.window.close();
+  });
+
+  /* 6c. 离线引擎起不来时自动改用浏览器在线识别 ---------------------- */
+  await testAsync('离线引擎起不来 → 当场换成浏览器在线识别，练习不中断', async () => {
+    const calls = { starts: 0, aborts: 0, stops: 0 };
+    const page = loadPage({
+      savedPack: true,
+      brokenProcessor: true,
+      speechRecognition: makeSpeechRecognition(calls),
+    });
+    await wait(40);
+    const d = page.window.document;
+    assert.strictEqual(page.window.KousuanOffline.state(), 'ready');
+    /* 有在线识别 + 离线包时才会显示引擎切换 */
+    assert.strictEqual(d.getElementById('engine-choice').hidden, false);
+
+    d.querySelector('[data-mode="voice"]').click();
+    d.getElementById('start-button').click();
+    await wait(400);
+
+    assert.strictEqual(d.getElementById('practice').hidden, false, '练习页被关掉了');
+    assert.strictEqual(d.getElementById('feedback').textContent, '离线语音没启动起来，已改用浏览器识别');
+    assert.ok(calls.starts >= 1, '没有启动浏览器识别');
+    const saved = JSON.parse(page.window.localStorage.getItem('kousuan:v1'));
+    assert.strictEqual(saved.prefs.engine, 'online');
+    assert.strictEqual(d.querySelector('[data-engine="online"]').getAttribute('aria-pressed'), 'true');
+    page.window.close();
+  });
+
+  await testAsync('缓存里的语音包装不起来 → 作废「已装好」标记，提示重新下载', async () => {
+    const page = loadPage({
+      savedPack: true,
+      failUrls: ['models/', 'cdn.jsdelivr.net', 'raw.githubusercontent.com'],
+    });
+    await wait(40);
+    let failed = false;
+    try {
+      await page.window.KousuanOffline.preload();
+    } catch (_) {
+      failed = true;
+    }
+    assert.strictEqual(failed, true, '装不起来却没有报错');
+    assert.strictEqual(page.window.KousuanOffline.state(), 'idle');
+    const saved = JSON.parse(page.window.localStorage.getItem('kousuan:voicepack:v1'));
+    assert.strictEqual(saved.ready, false);
+    page.window.close();
+  });
+
   /* 7. 默认设置与结构 ---------------------------------------------- */
   test('初始设置：打字作答 + 两位数 + 10 题', () => {
     const fresh = loadPage();
@@ -468,6 +568,12 @@ function loadPage(options = {}) {
     const links = HTML.match(/<(?:script|link)[^>]*(?:src|href)="(?!data:)[^"]+"/g) || [];
     const external = links.filter((tag) => !/manifest\.webmanifest|icon\.svg|icon-180\.png/.test(tag));
     assert.deepStrictEqual(external, []);
+  });
+
+  test('页面底部能查到第三方组件与协议（关于面板）', () => {
+    assert.ok(HTML.indexOf('vosk-browser') !== -1);
+    assert.ok(HTML.indexOf('Apache-2.0') !== -1);
+    assert.ok(/<details class="about-panel">/.test(HTML));
   });
 
   test('手机端答题区贴底（CSS 里有 sticky + 安全区）', () => {
