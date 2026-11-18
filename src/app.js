@@ -155,10 +155,9 @@
     } catch (error) {
       if (job !== download) return;
       if (job.signal.aborted) { setPackState('idle', '下载已取消，可以重新下载。'); return; }
+      const networkMessage = navigator.onLine === false ? '首次下载需要联网，请连接 Wi-Fi 后重试。' : '下载中断，请检查网络或换用 Wi-Fi 后重试。';
       const message = error.name === 'QuotaExceededError' ? '存储空间不足，请清理一些空间后重试。'
-        : navigator.onLine === false ? '首次下载需要联网，请连接 Wi-Fi 后重试。'
-        : error instanceof TypeError ? '下载中断，请检查网络或换用 Wi-Fi 后重试。'
-        : error.message || '下载失败，请检查网络和剩余空间后重试。';
+        : error instanceof TypeError ? networkMessage : error.message || '下载失败，请检查网络和剩余空间后重试。';
       setPackState('error', message);
     } finally {
       if (job === download) download = null;

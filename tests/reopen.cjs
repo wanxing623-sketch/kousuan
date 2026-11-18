@@ -15,7 +15,7 @@ module.exports = async function testReopen({ browserType, profile, base, wav, fi
   const messages = [];
   let page;
   function observe(p) {
-    p.on('console', msg => { if (msg.type() === 'error') messages.push(msg.text().slice(0, 240)); });
+    p.on('console', msg => { if (['warning', 'error'].includes(msg.type())) messages.push(msg.text().slice(0, 240)); });
     p.on('pageerror', err => messages.push(err.message.slice(0, 240)));
     p.on('requestfailed', req => messages.push(`${req.method()} ${req.url().slice(0, 150)}: ${req.failure().errorText}`));
     return p;

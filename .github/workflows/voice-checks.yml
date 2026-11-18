@@ -39,6 +39,7 @@ jobs:
           git diff --exit-code -- index.html
           python3 build.py --site
       - name: Prepare pinned test environment
+        id: browsers
         working-directory: tests
         run: |
           npm ci --no-audit --no-fund
@@ -48,6 +49,7 @@ jobs:
           docker run --rm --init --network none --shm-size=1g -e GITHUB_ACTIONS
           -v "$PWD:/site:ro" -w /site "$PLAYWRIGHT_IMAGE" node tests/smoke.cjs chromium
       - name: WebKit · offline answer after browser restart
+        if: ${{ !cancelled() && steps.browsers.outcome == 'success' }}
         run: >-
           docker run --rm --init --network none --shm-size=1g -e GITHUB_ACTIONS
           -v "$PWD:/site:ro" -w /site "$PLAYWRIGHT_IMAGE" node tests/smoke.cjs webkit

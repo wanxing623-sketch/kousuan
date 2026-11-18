@@ -130,15 +130,15 @@ const OfflineVoice = (() => {
         if (disposed) { reject(new Error('closed')); return; }
         // 稳定的完整 URL 同时也是 Vosk 解压后的 IndexedDB 缓存键（不能用随机 blob URL）。
         model = new window.Vosk.Model(new URL(files[1].path, base).href, -1);
-        const finish = ok => {
+        const finish = (ok, reason) => {
           clearTimeout(timer);
           cancelLoad = null;
-          if (ok) resolve(model); else reject(new Error('model'));
+          if (ok) resolve(model); else reject(new Error(reason || '模型未能载入'));
         };
-        const timer = setTimeout(() => finish(false), 60000);
+        const timer = setTimeout(() => finish(false, '模型载入超时'), 60000);
         cancelLoad = () => finish(false);
         model.on('load', message => finish(message.result));
-        model.on('error', () => finish(false));
+        model.on('error', message => finish(false, message.error));
       })).catch(error => { freeModel(); loading = null; throw error; });
       return loading;
     }
@@ -215,7 +215,11 @@ const OfflineVoice = (() => {
         abort();
         if (error.name === 'NotAllowedError' || error.name === 'SecurityError') events.error('not-allowed');
         else if (error.name === 'NotFoundError' || error.name === 'NotReadableError') events.error('audio-capture');
-        else events.error('offline-engine');
+        else {
+          // 只记录技术原因，方便定位设备兼容问题，不记录音频或识别到的内容。
+          console.warn('离线语音未能启动：', error.message || error.name);
+          events.error('offline-engine');
+        }
       }
     }
     function dispose() {
