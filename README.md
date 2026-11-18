@@ -12,7 +12,7 @@
 
 ### 语音方式与设备要求
 
-- **离线识别（有包时优先）**：用 WebAssembly / Web Worker 解码麦克风音频。不要求 `SpeechRecognition`；需要现代浏览器的 Web Audio、`getUserMedia`、Service Worker、Cache Storage 和 IndexedDB。推荐用近期版本的 Safari、Chrome 或 Firefox，在普通窗口打开。
+- **离线识别（有包时优先）**：用 WebAssembly / Web Worker 解码麦克风音频。不要求 `SpeechRecognition`；需要现代浏览器的 Web Audio、`getUserMedia`、Service Worker 和 IndexedDB。推荐用近期版本的 Safari、Chrome 或 Firefox，在普通窗口打开。
 - **浏览器识别（没装包时的可选方式）**：保留原来的 Web Speech API；仅在浏览器提供它时可用。设置页会明确标注「可能需要联网」。离线引擎出错不会偷偷切到这条路径。
 - 点麦克风可以暂停；切到后台、结束练习、改用打字都会释放麦克风。离线模式从后台回来后点「继续收音」，便于 iOS 重新解锁音频。没有听清可以重说，连续几轮无声会暂停收音。
 - 麦克风被拒时可在站点设置允许后重试，或直接改用打字。内嵌预览、应用内浏览器可能拦截存储或麦克风，建议在系统浏览器中打开。
@@ -34,7 +34,7 @@
 
 引擎和上述模型随附的 Apache-2.0 许可证、版权声明在 [`third_party/vosk/`](third_party/vosk/)。固定的 Git blob、长度和 SHA-256 在 [`src/voice-pack.json`](src/voice-pack.json)。音频只送入本地 Vosk worker；数字词表不会使用本题的正确答案。
 
-核心 HTML、样式和交互仍内联在 `index.html`，避免新旧页面和脚本混搭。**不在首屏预取模型**：只有点下载才安装同目录的 `sw.js`、缓存页面、获取并校验引擎和模型。离线包以版本化路径保存在 Cache Storage；Vosk 解压后的文件由其 IndexedDB 文件系统复用。就绪状态检查真实缓存，不把 localStorage 标记当成已下载。联网访问优先取新页面，断网从缓存打开。
+核心 HTML、样式和交互仍内联在 `index.html`，避免新旧页面和脚本混搭。**不在首屏预取模型**：只有点下载才安装同目录的 `sw.js`、缓存页面、获取并校验引擎和模型。页面与 Service Worker 从同一个 IndexedDB 读取离线首页和语音包；每个文件的内容与校验信息在同一事务内写入。显示「已下载」前检查首页和两个语音文件是否都在，不靠 localStorage 标记。Vosk 解压后的模型也可在下次启动时复用。联网访问优先取新页面，断网从缓存打开。
 
 ## 本地运行与发布
 
@@ -45,9 +45,9 @@ python3 -m http.server 8000 --directory dist
 
 访问 <http://localhost:8000>。`dist/` 是完整的静态站点，语音资源与页面**同源**，终端用户不必能访问第三方 CDN 或 GitHub API。可以部署在子目录下；大文件不提交到 Git。**手机访问电脑的局域网 HTTP 地址不是 localhost**，实机语音请使用 HTTPS 部署。
 
-不准备发布目录也可以 `python3 build.py && python3 -m http.server 8000`。默认构建不联网，仅更新仓库里的 `index.html`；此模式在用户选择安装时从 GitHub 的公共 blob API 获取相同资源，需要网络能访问该 API。请保留 `sw.js`、manifest 和图标，不要只复制 HTML 来提供离线语音。
+不准备发布目录也可以 `python3 build.py && python3 -m http.server 8000`。默认构建不联网，更新仓库里的 `index.html` 和 `sw.js`；此模式在用户选择安装时从 GitHub 的公共 blob API 获取相同资源，需要网络能访问该 API。请保留 `sw.js`、manifest 和图标，不要只复制 HTML 来提供离线语音。
 
-GitHub Pages 推荐将 **Settings → Pages → Source** 设为 **GitHub Actions**。`.github/workflows/pages.yml` 在推送到 `main` 时构建并发布 `dist/`。改动 `src/` 后请运行 `python3 build.py` 并一起提交更新后的根目录 `index.html`。
+GitHub Pages 推荐将 **Settings → Pages → Source** 设为 **GitHub Actions**。`.github/workflows/pages.yml` 在推送到 `main` 时构建并发布 `dist/`。改动 `src/` 后请运行 `python3 build.py` 并一起提交生成的 `index.html` 和 `sw.js`。
 
 ## 回归测试
 

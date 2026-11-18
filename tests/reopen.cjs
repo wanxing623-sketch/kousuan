@@ -10,20 +10,24 @@ async function waitForPack(page, expected) {
 
 // Diagnostics only, after an assertion failed. The neutral in-memory page is outside
 // the app scope; it can inspect this profile even if the app document failed to load.
-async function cacheReport(ctx, base) {
+async function storeReport(ctx, base) {
   const p = await ctx.newPage();
   try {
     const url = new URL('/__test_cache_state', base).href;
     await p.route(url, route => route.fulfill({ contentType: 'text/html', body: '<title>cache diagnostics</title>' }));
     await p.goto(url, { timeout: 5000 });
-    return await p.evaluate(async () => {
-      const report = {};
-      for (const name of await caches.keys()) {
-        const cache = await caches.open(name);
-        report[name] = (await cache.keys()).map(key => new URL(key.url).pathname);
-      }
-      return JSON.stringify(report);
-    });
+    return await p.evaluate(base => new Promise((resolve, reject) => {
+      const request = indexedDB.open('kousuan-offline:' + encodeURIComponent(new URL(base).pathname));
+      request.onupgradeneeded = () => request.transaction.abort(); // don't create a DB just for diagnostics
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const db = request.result;
+        const tx = db.transaction(['headers', 'bodies']);
+        const headers = tx.objectStore('headers').getAllKeys(), bodies = tx.objectStore('bodies').getAllKeys();
+        tx.oncomplete = () => { db.close(); resolve(JSON.stringify({ headers: headers.result, bodies: bodies.result })); };
+        tx.onabort = () => { db.close(); reject(tx.error); };
+      };
+    }), base);
   } finally { await p.close(); }
 }
 
@@ -52,14 +56,13 @@ module.exports = async function testReopen({ browserType, profile, base, wav, fi
     await page.click('#pack-button');
     await waitForPack(page, 'ready');
     assert(await page.evaluate(async () => {
-      const cache = await caches.open('kousuan-voice:' + new URL('.', document.baseURI).href);
-      const html = await cache.match(new URL('index.html', document.baseURI).href);
+      const html = await createVoiceStore(document.baseURI).match('index.html');
       return html && (await html.text()).includes('kousuanReady');
     }), 'The offline HTML must be readable before closing');
     assert(await page.evaluate(() => !window.Vosk), 'The decoder must not be preloaded during installation');
   } catch (err) {
     const reason = await explain('install', err);
-    reason.message += '\nStored after install: ' + await cacheReport(ctx, base).catch(e => e.message);
+    reason.message += '\nStored after install: ' + await storeReport(ctx, base).catch(e => e.message);
     throw reason;
   } finally {
     await ctx.close();
@@ -102,7 +105,7 @@ module.exports = async function testReopen({ browserType, profile, base, wav, fi
     console.log(`✓ ${browserType.name()} persistent profile: install → close browser → reopen offline → real WAV → 83 → score`);
   } catch (err) {
     const reason = await explain('offline reopen', err);
-    reason.message += '\nStored after restart: ' + await cacheReport(ctx, base).catch(e => e.message);
+    reason.message += '\nStored after restart: ' + await storeReport(ctx, base).catch(e => e.message);
     throw reason;
   } finally {
     await ctx.close();

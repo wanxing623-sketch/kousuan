@@ -3,7 +3,7 @@ const OfflineVoice = (() => {
   'use strict';
   const files = /*@files*/[];
   const base = /^https?:/.test(document.baseURI) ? new URL('.', document.baseURI).href : '';
-  const cacheName = 'kousuan-voice:' + base;
+  const store = createVoiceStore(base);
   const shell = ['index.html', 'manifest.webmanifest', 'icon.svg', 'icon-180.png', 'icon-512.png'];
   const Audio = window.AudioContext || window.webkitAudioContext;
   const size = files.reduce((sum, file) => sum + file.size, 0);
@@ -13,18 +13,16 @@ const OfflineVoice = (() => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !Audio || !window.WebAssembly || !window.Worker) {
       return '当前浏览器不支持本机语音识别。可以用新版 Safari 或 Chrome 打开，也可以直接打字。';
     }
-    if (!navigator.serviceWorker || !window.caches || !window.indexedDB || !window.fetch || !window.AbortController || !window.crypto || !window.crypto.subtle || !window.ReadableStream) {
+    if (!navigator.serviceWorker || !window.indexedDB || !window.fetch || !window.AbortController || !window.crypto || !window.crypto.subtle || !window.ReadableStream) {
       return '当前浏览器不能保存离线语音包，请用普通浏览器窗口打开，或跳过下载。';
     }
     return '';
   }
 
   async function installed() {
-    if (unsupported() || !(await caches.has(cacheName))) return false;
-    const cache = await caches.open(cacheName);
-    if (!(await cache.match(new URL(shell[0], base).href))) return false;
-    const hits = await Promise.all(files.map(file => cache.match(file.path)));
-    return hits.every((hit, i) => hit && hit.headers.get('X-Pack-SHA256') === files[i].sha256);
+    if (unsupported() || !(await store.has(shell[0]))) return false;
+    const hits = await Promise.all(files.map(file => store.has(file.path, file.sha256)));
+    return hits.every(Boolean);
   }
 
   function ensureWorker() {
@@ -47,25 +45,18 @@ const OfflineVoice = (() => {
 
   async function install(signal, progress) {
     const check = () => { if (signal.aborted) throw new Error('已取消下载'); };
-    // A single writer creates the cache before registering the Worker. A separate
-    // shell cache created by SW.install can be invisible to the page on WebKit.
-    const cache = await caches.open(cacheName);
     await ensureWorker();
     check();
     await Promise.all(shell.map(async name => {
       const url = new URL(name, base).href;
       const response = await fetch(url + '?install', { signal, cache: 'no-store' });
       if (!response.ok) throw new Error(`离线页面下载失败（HTTP ${response.status}），请重试。`);
-      const headers = new Headers(response.headers);
-      // The body is decoded already; retain document security headers.
-      ['Content-Encoding', 'Content-Length', 'Cache-Control'].forEach(key => headers.delete(key));
-      await cache.put(url, new Response(await response.arrayBuffer(), { headers }));
+      await store.putResponse(url, response);
     }));
     let done = 0;
     for (const file of files) {
       check();
-      const cached = await cache.match(file.path);
-      if (!cached || cached.headers.get('X-Pack-SHA256') !== file.sha256) {
+      if (!(await store.has(file.path, file.sha256))) {
         const opts = { signal, credentials: 'same-origin', cache: 'no-store' };
         if (file.source.indexOf('https://api.github.com/') === 0) opts.headers = { Accept: 'application/vnd.github.raw+json' };
         const res = await fetch(file.source, opts);
@@ -92,9 +83,7 @@ const OfflineVoice = (() => {
         const hex = Array.from(digest, n => ('0' + n.toString(16)).slice(-2)).join('');
         if (hex !== file.sha256) throw new Error('语音包校验失败，请重新下载。');
         check();
-        await cache.put(file.path, new Response(bytes, { headers: {
-          'Content-Type': file.type, 'Content-Length': String(file.size), 'X-Pack-SHA256': hex
-        } }));
+        await store.put(file.path, new Blob([bytes], { type: file.type }), { 'Content-Type': file.type }, hex);
       }
       done += file.size;
       progress(done, false);

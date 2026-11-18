@@ -146,11 +146,17 @@ async function testOffline(browser, base) {
   console.log('✓ pause, background, delayed permission after switching to typing and result statistics');
   disconnected = false;
   await ctx.setOffline(false);
-  await page.evaluate(async () => {
-    const cacheName = (await caches.keys()).find(n => n.startsWith('kousuan-voice:'));
-    const cache = await caches.open(cacheName);
-    await cache.delete((await cache.keys()).find(k => k.url.endsWith('.gz')));
-  });
+  await page.evaluate(model => new Promise((resolve, reject) => {
+    // Remove only the body, leaving the metadata intact, just as a partial loss might.
+    const request = indexedDB.open('kousuan-offline:' + encodeURIComponent(new URL('.', document.baseURI).pathname));
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result, tx = db.transaction('bodies', 'readwrite');
+      tx.objectStore('bodies').delete(new URL(model, document.baseURI).href);
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onabort = () => { db.close(); reject(tx.error); };
+    };
+  }), model);
   await page.reload();
   await page.click('#manage-pack');
   await state('idle');
@@ -162,10 +168,10 @@ async function testStorage(browser, base) {
   const page = await browser.newPage();
   await page.addInitScript(() => {
     window.SpeechRecognition = window.webkitSpeechRecognition = undefined;
-    const put = Cache.prototype.put;
-    Cache.prototype.put = function (key, response) {
-      if (String(key).includes('voice-assets/')) return Promise.reject(new DOMException('full', 'QuotaExceededError'));
-      return put.call(this, key, response);
+    const put = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (body, key) {
+      if (this.name === 'bodies' && String(key).includes('voice-assets/')) throw new DOMException('full', 'QuotaExceededError');
+      return put.call(this, body, key);
     };
   });
   await page.goto(base);
