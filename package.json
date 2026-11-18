@@ -1,0 +1,16 @@
+{
+  "name": "kousuan",
+  "version": "1.0.0",
+  "private": true,
+  "description": "速算练习：单文件加减法口算页，支持键盘输入与离线语音作答",
+  "scripts": {
+    "build": "python3 build.py",
+    "test": "node tests/run.js && node tests/engine-smoke.js",
+    "serve": "python3 -m http.server 8000",
+    "test:ui": "node tests/run.js --verbose",
+    "smoke": "node tests/engine-smoke.js"
+  },
+  "devDependencies": {
+    "jsdom": "^31.0.1"
+  }
+}

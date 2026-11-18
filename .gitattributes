@@ -1,0 +1,7 @@
+# 生成物在 diff 里意义不大
+index.html linguist-generated=true
+vendor/vosk-browser.js linguist-vendored=true
+
+# 42 MB 的语音模型：大文件，建议用 Git LFS 托管（本机没装 lfs 时按普通文件提交）
+#   git lfs install && git lfs track "models/*.tar.gz"
+models/*.tar.gz -text

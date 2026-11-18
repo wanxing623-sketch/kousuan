@@ -16,12 +16,47 @@
 </head>
 <body>
   <main class="app-shell">
+    <div id="embed-tip" class="embed-tip" hidden>
+      现在是在应用内的预览窗口里打开，麦克风和声音下载都容易被拦。
+      <a href="#" target="_blank" rel="noopener">在新窗口打开</a>
+    </div>
     <header class="topbar">
       <a class="brand" href="./" aria-label="速算练习">
         <span class="brand-mark" aria-hidden="true">＋</span>
         <span>速算练习</span>
       </a>
     </header>
+
+
+    <section id="welcome" class="panel welcome-panel" aria-label="离线语音包" hidden>
+      <div class="welcome-hero" aria-hidden="true">
+        <span class="welcome-wave"></span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5v3"/></svg>
+      </div>
+      <h2>先装上离线语音，手机也能说话答题</h2>
+      <p class="welcome-lead">
+        手机浏览器（尤其微信、QQ 里的内置浏览器）经常用不了网页自带的语音识别。
+        下载一次离线的中文语音包，声音在这台手机上直接识别，<strong>不用联网、不上传录音</strong>。
+      </p>
+
+      <ul class="pack-facts">
+        <li><strong>约 42 MB</strong><span>只需下载一次</span></li>
+        <li><strong>本机识别</strong><span>录音不出设备</span></li>
+        <li><strong>不用联网</strong><span>说话答题不再连服务器</span></li>
+      </ul>
+
+      <div id="welcome-progress" class="pack-progress" hidden>
+        <div class="pack-track"><span id="welcome-fill"></span></div>
+        <p id="welcome-stage" class="pack-stage">正在准备…</p>
+      </div>
+
+      <button id="welcome-download" class="primary-button" type="button">
+        <span>下载离线语音包</span><span class="button-arrow" aria-hidden="true">↓</span>
+      </button>
+      <button id="welcome-cancel" class="text-button welcome-cancel" type="button" hidden>取消下载</button>
+      <button id="welcome-skip" class="text-button welcome-skip" type="button">先用打字作答，稍后再下载</button>
+      <p class="welcome-note">语音包来自开源项目 Vosk（Apache-2.0），模型 <code>vosk-model-small-cn-0.22</code>，下载后保存在浏览器本地。</p>
+    </section>
 
     <section id="setup" class="panel setup-panel" aria-label="练习设置">
       <fieldset class="setting-group">
@@ -41,6 +76,24 @@
             <span class="mode-copy"><strong>语音作答</strong><small>看题后直接说出答案</small></span>
             <span class="radio-dot" aria-hidden="true"></span>
           </button>
+        </div>
+        <div id="engine-choice" class="engine-choice" hidden>
+          <span class="engine-label">语音识别方式</span>
+          <div class="engine-options" role="group" aria-label="语音识别方式">
+            <button class="engine-option selected" type="button" data-engine="offline" aria-pressed="true">
+              <strong>离线识别</strong><small id="engine-offline-note">未下载</small>
+            </button>
+            <button class="engine-option" type="button" data-engine="online" aria-pressed="false">
+              <strong>浏览器在线</strong><small id="engine-online-note">无需下载</small>
+            </button>
+          </div>
+        </div>
+        <div id="pack-row" class="pack-row" hidden>
+          <div class="pack-row-copy">
+            <strong id="pack-title">离线语音包</strong>
+            <small id="pack-status">还没下载</small>
+          </div>
+          <button id="pack-action" class="mini-button" type="button">下载</button>
         </div>
         <p class="support-note" id="voice-note" hidden>这个浏览器不支持语音识别，先用打字作答也可以。</p>
         <p class="support-note tip" id="voice-tip" hidden>开始后请允许麦克风，说完答案会自动进入下一题。</p>
@@ -95,11 +148,13 @@
         <div id="question" class="question" aria-live="polite">47 <span>+</span> 36 <span>=</span> ?</div>
         <div id="feedback" class="feedback" role="status" aria-live="polite">仔细想一想，输入你的答案</div>
 
-        <form id="answer-form" autocomplete="off" novalidate>
-          <label class="sr-only" for="answer">输入答案</label>
-          <input id="answer" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="输入答案" autocomplete="off" enterkeyhint="done">
-          <button class="submit-button" type="submit">确认答案 <span aria-hidden="true">↗</span></button>
-        </form>
+        <div id="answer-dock" class="answer-dock">
+          <form id="answer-form" autocomplete="off" novalidate>
+            <label class="sr-only" for="answer">输入答案</label>
+            <input id="answer" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="输入答案" autocomplete="off" enterkeyhint="done">
+            <button class="submit-button" type="submit">确认答案 <span aria-hidden="true">↗</span></button>
+          </form>
+        </div>
 
         <div id="voice-area" class="voice-area" hidden>
           <button id="voice-button" class="voice-button" type="button" aria-pressed="false">
@@ -110,6 +165,7 @@
           </button>
           <p id="heard-text" class="heard-text" aria-live="polite"></p>
           <p id="voice-hint" class="voice-hint">说完答案会自动进入下一题，点麦克风可暂停</p>
+          <p id="offline-badge" class="offline-badge" hidden>离线识别 · 录音不出本机</p>
           <div id="voice-actions" class="voice-actions" hidden>
             <button id="voice-retry" class="mini-button" type="button">重新打开麦克风</button>
             <button id="new-tab" class="mini-button" type="button" hidden>在新窗口打开</button>
@@ -168,6 +224,24 @@
         if (reported) return;
         reported = true;
         strip(text);
+      }
+
+      /* 微信 / QQ 内置浏览器里，网页语音识别和中途下载 42 MB 都不稳，
+         先把「换个真正的浏览器打开」这件事说清楚 */
+      try {
+        var ua = navigator.userAgent || '';
+        var inWechat = /MicroMessenger|QQ\//i.test(ua);
+        var embedded = (window.self !== window.top) || inWechat;
+        if (embedded) {
+          var tip = document.getElementById('embed-tip');
+          tip.hidden = false;
+          tip.querySelector('a').href = location.href;
+          if (inWechat) {
+            tip.firstChild.nodeValue = '现在是在微信 / QQ 里打开，语音识别和语音包下载容易被拦。建议点右上角「···」选择在浏览器打开。';
+          }
+        }
+      } catch (_) {
+        /* 提示不出来不影响答题 */
       }
 
       window.onerror = function (message, source, line) {
