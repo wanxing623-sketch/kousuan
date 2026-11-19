@@ -266,11 +266,15 @@ const OfflineVoice = (() => {
             }
 
             if (!gateState.open && !gateState.justClosed) {
-              // 门没开：不把音频送给识别器，远处说得再清楚也不会被当成答案。
-              // 只留最近约 320 ms 预录，等近处声音开门时补送，避免吞掉第一个字。
+              // 门没开：不把原声送给识别器，远处说得再清楚也不会被当成答案；
+              // 改喂等长静音，解码器的时间轴和特征归一化保持连续（与一直开麦时
+              // 一致），不会因裁剪拼接音频而丢掉一句话的首字。另留最近约 320 ms
+              // 预录，等近处声音开门时补送，避免吞掉第一个字。
               preRoll.push(new Float32Array(samples));
               preRollMs += blockMs;
               while (preRoll.length > 1 && preRollMs > 320) preRollMs -= preRoll.shift().length / c.ctx.sampleRate * 1000;
+              if (!c.silence || c.silence.length !== samples.length) c.silence = c.ctx.createBuffer(1, samples.length, c.ctx.sampleRate);
+              decoder.acceptWaveform(c.silence);
               // 远处一直有人说话不算「没声音」：推迟无声提示，界面会提示已被挡住。
               if (gateState.audible) armSilence();
               return;
