@@ -150,7 +150,7 @@ async function testOffline(browser, base) {
   await page.click('#voice-retry');
   await page.evaluate(() => {
     // 采样门控历史：等待期间音量最大值、是否开过门/挡过声音，失败时随报错带出
-    const diag = window.__micDiag = { maxFill: 0, maxThr: 0, sawOpen: false, sawBlocked: false, heard: '' };
+    const diag = window.__micDiag = { maxFill: 0, maxThr: 0, sawOpen: false, sawBlocked: false, heard: '', feedbackSeen: [] };
     diag.timer = setInterval(() => {
       const fill = parseFloat(document.querySelector('#mic-fill').style.width) || 0;
       const thr = parseFloat(document.querySelector('#mic-threshold').style.left) || 0;
@@ -162,6 +162,7 @@ async function testOffline(browser, base) {
       diag.heard = document.querySelector('#heard-text').textContent || diag.heard;
       diag.progress = document.querySelector('#progress-label').textContent;
       diag.feedback = document.querySelector('#feedback').textContent;
+      if (diag.feedback && !diag.feedbackSeen.includes(diag.feedback)) diag.feedbackSeen.push(diag.feedback);
     }, 100);
   });
   try {
@@ -171,7 +172,7 @@ async function testOffline(browser, base) {
       maxFill: window.__micDiag.maxFill, maxThr: window.__micDiag.maxThr,
       sawOpen: window.__micDiag.sawOpen, sawBlocked: window.__micDiag.sawBlocked,
       heard: window.__micDiag.heard, progress: window.__micDiag.progress,
-      feedback: window.__micDiag.feedback,
+      feedbackSeen: window.__micDiag.feedbackSeen,
     }).catch(() => null);
     throw new Error(`voice answer not scored; mic diag: ${JSON.stringify(diag)}`);
   }
