@@ -148,19 +148,29 @@ async function testOffline(browser, base) {
   assert.match(await page.textContent('#voice-hint'), /权限/);
   await page.evaluate(() => { window.refuseMic = false; });
   await page.click('#voice-retry');
+  await page.evaluate(() => {
+    // 采样门控历史：等待期间音量最大值、是否开过门/挡过声音，失败时随报错带出
+    const diag = window.__micDiag = { maxFill: 0, maxThr: 0, sawOpen: false, sawBlocked: false, heard: '' };
+    diag.timer = setInterval(() => {
+      const fill = parseFloat(document.querySelector('#mic-fill').style.width) || 0;
+      const thr = parseFloat(document.querySelector('#mic-threshold').style.left) || 0;
+      const state = document.querySelector('#mic-state').textContent;
+      diag.maxFill = Math.max(diag.maxFill, fill);
+      diag.maxThr = Math.max(diag.maxThr, thr);
+      if (state.includes('正在收你的声音')) diag.sawOpen = true;
+      if (state.includes('已挡住')) diag.sawBlocked = true;
+      diag.heard = document.querySelector('#heard-text').textContent || diag.heard;
+    }, 100);
+  });
   try {
     await page.waitForFunction(() => document.querySelector('#score-label').textContent === '答对 1 题', null, { timeout: 60000 });
   } catch (error) {
-    // 把门控现场打包进报错，CI 注解里能直接看到是「门没开」还是「识别没出字」
-    const diag = await page.evaluate(() => ({
-      fill: document.querySelector('#mic-fill').style.width,
-      thr: document.querySelector('#mic-threshold').style.left,
-      state: document.querySelector('#mic-state').textContent,
-      note: document.querySelector('#mic-note').textContent,
-      heard: document.querySelector('#heard-text').textContent,
+    const diag = await page.evaluate(() => window.__micDiag && {
+      maxFill: window.__micDiag.maxFill, maxThr: window.__micDiag.maxThr,
+      sawOpen: window.__micDiag.sawOpen, sawBlocked: window.__micDiag.sawBlocked,
+      heard: window.__micDiag.heard,
       feedback: document.querySelector('#feedback').textContent,
-      label: document.querySelector('#voice-label').textContent,
-    })).catch(() => null);
+    }).catch(() => null);
     throw new Error(`voice answer not scored; mic diag: ${JSON.stringify(diag)}`);
   }
   await page.waitForFunction(() => document.querySelector('#progress-label').textContent === '第 2 / 10 题');
