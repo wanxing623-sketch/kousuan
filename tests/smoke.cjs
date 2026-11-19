@@ -163,6 +163,8 @@ async function testOffline(browser, base) {
       diag.progress = document.querySelector('#progress-label').textContent;
       diag.feedback = document.querySelector('#feedback').textContent;
       if (diag.feedback && !diag.feedbackSeen.includes(diag.feedback)) diag.feedbackSeen.push(diag.feedback);
+      // 判错的那一刻 heard-text 还留着触发判分的最终识别文字，记下来看提交的到底是什么
+      if (diag.feedback.startsWith('正确答案是')) diag.given = document.querySelector('#heard-text').textContent;
     }, 100);
   });
   try {
@@ -172,7 +174,7 @@ async function testOffline(browser, base) {
       maxFill: window.__micDiag.maxFill, maxThr: window.__micDiag.maxThr,
       sawOpen: window.__micDiag.sawOpen, sawBlocked: window.__micDiag.sawBlocked,
       heard: window.__micDiag.heard, progress: window.__micDiag.progress,
-      feedbackSeen: window.__micDiag.feedbackSeen,
+      feedbackSeen: window.__micDiag.feedbackSeen, given: window.__micDiag.given,
     }).catch(() => null);
     throw new Error(`voice answer not scored; mic diag: ${JSON.stringify(diag)}`);
   }
