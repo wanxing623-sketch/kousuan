@@ -1172,7 +1172,7 @@ body { background: #f5f6f3; }
             <span class="radio-dot" aria-hidden="true"></span>
           </button>
         </div>
-        <p class="support-note" id="mic-setup-note">只听近处会关掉自动增益、只把近处响亮的声音送去识别，需把手机拿近嘴边；练习中也能随时切换。</p>
+        <p class="support-note" id="mic-setup-note">只听近处只把明显比环境响、且持续一小段的声音送去识别，需把手机拿近嘴边；练习中也能随时切换。</p>
       </fieldset>
 
       <fieldset class="setting-group">
@@ -1370,9 +1370,11 @@ function createVoiceStore(base) {
 /* 近讲门控（near-field gate）：只把「离麦克风近、明显比环境底噪响」的声音送给识别器。
  *
  * 原理：单麦克风分不清方向，但近处说话比远处说话响得多（距离每远一倍约弱 6 dB）。
- * 浏览器自动增益（AGC）会把远处人声放大到和近处一样响，所以近讲档要关掉 AGC，
- * 再用这里的门控按响度筛选：持续估计环境底噪，只有响度超过 max(绝对下限, 底噪×倍数)
- * 并维持一小段时间的声音才开门，开门前的预录音频会一并补送，避免吞掉第一个字。
+ * 这里持续估计环境底噪，只有响度超过 max(绝对下限, 底噪×倍数) 并维持一小段时间
+ * 的声音才开门；开门前的预录音频会一并补送，关门时改喂静音，避免吞/丢首字。
+ * 麦克风自动增益特意保留：实测关掉后部分浏览器音频管线会让首字解码失真，
+ * 且设备间增益差异使绝对响度不可靠；且用户近讲时增益会被近声压低，
+ * 这段时间里远处声音更难越过相对门槛。
  * 这借鉴了开源 VAD（如 Silero VAD / WebRTC VAD）「先判活再识别」的思路，但判的不是
  * 「是不是人声」，而是「够不够近」——远处的人声同样是人声，普通 VAD/降噪挡不住。
  *
@@ -1717,8 +1719,10 @@ const OfflineVoice = (() => {
         try { c.ctx = new Audio({ sampleRate: 16000 }); }
         catch (_) { c.ctx = new Audio(); }
         const unlock = c.ctx.resume();
-        // 只听近处时必须关掉自动增益：AGC 会把远处人声放大到和近处一样响，
-        // 近讲门控就分不出远近了。标准收音保留 AGC，手机放远时也能听清。
+        // 自动增益保留开启：实测关掉后 Chromium 的音频管线会让一句话的首字
+        // 解码失真（端到端用例稳定复现），且各设备麦克风增益差异大、关掉后
+        // 响度绝对值不可靠。远近改由近讲门控按「相对底噪的响度 + 持续性」
+        // 区分；用户近讲时增益会被近声压低，这段时间远处声音更难开门。
         // 噪声抑制/回声消除继续开，压低风扇、电视底噪这类非人声干扰。
         const permission = navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: { ideal: 16000 }, echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false })
           .then(stream => {
@@ -2021,7 +2025,7 @@ const OfflineVoice = (() => {
     });
     el('mic-group').hidden = prefs.mode !== 'voice';
     el('mic-setup-note').textContent = offlineReady
-      ? '只听近处会关掉自动增益、只把近处响亮的声音送去识别，需把手机拿近嘴边；练习中也能随时切换。'
+      ? '只听近处只把明显比环境响、且持续一小段的声音送去识别，需把手机拿近嘴边；练习中也能随时切换。'
       : '只听近处需要离线语音包；未装包时的浏览器语音服务由浏览器直接收音，无法在本地挡住远处声音。';
     document.querySelectorAll('[data-level]').forEach((button) => {
       const on = button.dataset.level === prefs.level;

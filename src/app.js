@@ -188,7 +188,7 @@
     });
     el('mic-group').hidden = prefs.mode !== 'voice';
     el('mic-setup-note').textContent = offlineReady
-      ? '只听近处会关掉自动增益、只把近处响亮的声音送去识别，需把手机拿近嘴边；练习中也能随时切换。'
+      ? '只听近处只把明显比环境响、且持续一小段的声音送去识别，需把手机拿近嘴边；练习中也能随时切换。'
       : '只听近处需要离线语音包；未装包时的浏览器语音服务由浏览器直接收音，无法在本地挡住远处声音。';
     document.querySelectorAll('[data-level]').forEach((button) => {
       const on = button.dataset.level === prefs.level;

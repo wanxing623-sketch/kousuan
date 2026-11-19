@@ -222,8 +222,10 @@ const OfflineVoice = (() => {
         try { c.ctx = new Audio({ sampleRate: 16000 }); }
         catch (_) { c.ctx = new Audio(); }
         const unlock = c.ctx.resume();
-        // 只听近处时必须关掉自动增益：AGC 会把远处人声放大到和近处一样响，
-        // 近讲门控就分不出远近了。标准收音保留 AGC，手机放远时也能听清。
+        // 自动增益保留开启：实测关掉后 Chromium 的音频管线会让一句话的首字
+        // 解码失真（端到端用例稳定复现），且各设备麦克风增益差异大、关掉后
+        // 响度绝对值不可靠。远近改由近讲门控按「相对底噪的响度 + 持续性」
+        // 区分；用户近讲时增益会被近声压低，这段时间远处声音更难开门。
         // 噪声抑制/回声消除继续开，压低风扇、电视底噪这类非人声干扰。
         const permission = navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: { ideal: 16000 }, echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false })
           .then(stream => {
