@@ -1948,12 +1948,18 @@ const OfflineVoice = (() => {
         try { c.ctx = new Audio({ sampleRate: 16000 }); }
         catch (_) { c.ctx = new Audio(); }
         const unlock = c.ctx.resume();
-        const audio = { channelCount: 1, sampleRate: { ideal: 16000 }, echoCancellation: true, noiseSuppression: true };
+        const basic = { channelCount: 1, sampleRate: { ideal: 16000 }, echoCancellation: true, noiseSuppression: true };
         // 近讲收音：关掉自动增益（它会在你不说话时把远处的人声放大到和你一样响），
         // 并在支持的浏览器上请求系统的人声隔离。都只是「尽量」，不支持也不会报错。
         c.agc = near.mode === 'off';
-        if (!c.agc) Object.assign(audio, { autoGainControl: false, voiceIsolation: true });
-        const permission = navigator.mediaDevices.getUserMedia({ audio, video: false })
+        const audio = c.agc ? basic : Object.assign({ autoGainControl: false, voiceIsolation: true }, basic);
+        const open = constraints => navigator.mediaDevices.getUserMedia({ audio: constraints, video: false });
+        const permission = open(audio)
+          // 个别浏览器若把这两项当成硬性要求而拒绝，就用原来的设置再开一次，语音作答不受影响。
+          .catch(error => {
+            if (audio === basic || !error || error.name !== 'OverconstrainedError' || c !== capture) throw error;
+            return open(basic);
+          })
           .then(stream => {
             if (c !== capture) { stream.getTracks().forEach(track => track.stop()); return; }
             c.stream = stream;
@@ -1999,7 +2005,7 @@ const OfflineVoice = (() => {
         else if (error.name === 'NotFoundError' || error.name === 'NotReadableError') events.error('audio-capture');
         else {
           // 只记录技术原因，方便定位设备兼容问题，不记录音频或识别到的内容。
-          console.warn('离线语音未能启动：', error.message || error.name);
+          console.warn('离线语音未能启动：', [error.name, error.constraint, error.message].filter(Boolean).join(' '));
           events.error('offline-engine');
         }
       }

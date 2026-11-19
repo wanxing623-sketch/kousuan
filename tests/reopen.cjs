@@ -76,7 +76,11 @@ module.exports = async function testReopen({ browserType, profile, base, wav, fi
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
       // Only substitute the input device. Use a real MediaStream / Web Audio graph,
       // Vosk WASM, transcript parser and scoring, without needing a physical microphone.
-      navigator.mediaDevices.getUserMedia = async () => {
+      // Patch the prototype: WebKit may garbage-collect the navigator.mediaDevices wrapper and
+      // hand out a fresh one, which silently drops a property set on the instance.
+      window.micRequests = [];
+      MediaDevices.prototype.getUserMedia = async constraints => {
+        window.micRequests.push(constraints && constraints.audio);
         const audio = new AudioContext();
         await audio.resume();
         const output = audio.createMediaStreamDestination();
@@ -135,6 +139,9 @@ module.exports = async function testReopen({ browserType, profile, base, wav, fi
     assert.match(await page.textContent('#near-count'), /已过滤 [1-9]\d* 段/);
     const stored = async () => JSON.parse(await page.evaluate(() => localStorage.getItem('kousuan:v1'))).prefs;
     assert.equal((await stored()).nearLevels.length, 1, 'the voice level of the correct answer is remembered');
+    const micRequests = () => page.evaluate(() => window.micRequests);
+    const opened = (await micRequests()).length;
+    assert.equal((await micRequests())[opened - 1].autoGainControl, false, 'filtering asks for automatic gain off');
 
     // The range switch cycles 只听面前 → 近处说话 → 不过滤 → 只听面前 and starts a fresh calibration.
     // It must not touch the practice mode: it once shared the setup page's data-mode hook.
@@ -150,6 +157,9 @@ module.exports = async function testReopen({ browserType, profile, base, wav, fi
     await page.waitForSelector('.voice-button.is-listening');
     assert(await page.isHidden('#voice-actions'), await page.textContent('#voice-hint'));
     assert.equal((await stored()).mode, 'voice');
+    // Only the switches that change automatic gain reopen the microphone: 不过滤 and back.
+    const reopened = (await micRequests()).slice(opened).map(audio => audio.autoGainControl);
+    assert.deepEqual(reopened, [undefined, false], 'the microphone reopens with the matching gain setting');
 
     await page.click('#quit-button');
     assert.equal(await page.textContent('#result-total'), '1', await page.textContent('#mistakes'));

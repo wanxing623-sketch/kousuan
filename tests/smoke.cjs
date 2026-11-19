@@ -55,9 +55,13 @@ async function testOffline(browser, base) {
     const mic = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
     window.tracks = [];
     window.micCalls = 0;
+    window.micAudio = [];
     navigator.mediaDevices.getUserMedia = async constraints => {
       window.micCalls++;
+      window.micAudio.push(constraints.audio);
       if (window.refuseMic) throw new DOMException('denied', 'NotAllowedError');
+      // A browser that treats the near-voice microphone settings as hard requirements.
+      if (window.overconstrainNear && constraints.audio.autoGainControl === false) throw new OverconstrainedError('autoGainControl', 'Invalid constraint');
       if (window.delayMic) await new Promise(resolve => { window.grantMic = resolve; });
       const stream = await mic(constraints);
       window.tracks.push(...stream.getTracks());
@@ -144,11 +148,14 @@ async function testOffline(browser, base) {
   await page.click('#start-button');
   await page.waitForSelector('#voice-actions');
   assert.match(await page.textContent('#voice-hint'), /权限/);
-  await page.evaluate(() => { window.refuseMic = false; });
+  await page.evaluate(() => { window.refuseMic = false; window.overconstrainNear = true; });
   await page.click('#voice-retry');
   await page.waitForFunction(() => document.querySelector('#score-label').textContent === '答对 1 题', null, { timeout: 60000 });
   await page.waitForFunction(() => document.querySelector('#progress-label').textContent === '第 2 / 10 题');
-  console.log('✓ offline cold start and permission retry; real Chinese WAV → Vosk WASM → 83 → next question');
+  assert.deepEqual(await page.evaluate(() => window.micAudio.slice(-2).map(audio => audio.autoGainControl)), [false, undefined],
+    'a rejected near-voice request is retried once with the basic microphone settings');
+  await page.evaluate(() => { window.overconstrainNear = false; });
+  console.log('✓ offline cold start, permission retry and microphone-settings fallback; real Chinese WAV → Vosk WASM → 83 → next question');
 
   await page.click('#voice-button');
   await noLiveMic(page);
