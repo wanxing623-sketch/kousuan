@@ -8,7 +8,7 @@
    * 对不上就带参数重新取一次页面。
    * ------------------------------------------------------------------ */
 
-  const REQUIRED_IDS = ['welcome', 'pack-button', 'setup', 'practice', 'results', 'answer-form', 'question', 'voice-button', 'bubble-area', 'bubble-field'];
+  const REQUIRED_IDS = ['welcome', 'pack-button', 'setup', 'practice', 'results', 'answer-form', 'question', 'voice-button', 'near-toggle', 'bubble-area', 'bubble-field'];
   const domMatches = REQUIRED_IDS.every((id) => document.getElementById(id));
   if (!domMatches) {
     if (location.search.indexOf('fresh=') === -1) {
@@ -44,7 +44,9 @@
   const inFrame = window.self !== window.top;
   const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
-  const defaults = { mode: 'type', level: 'two', count: 10, welcomed: false, voiceEngine: 'browser' };
+  // nearMode：离线语音的收音范围（strong 只听面前 / standard 近处说话 / off 不过滤）；
+  // nearLevels：最近几次答对时的说话音量（dBFS），用来校准门限，只存在本机。
+  const defaults = { mode: 'type', level: 'two', count: 10, welcomed: false, voiceEngine: 'browser', nearMode: 'strong' };
   let prefs = Object.assign({}, defaults);
   let best = {};
 
@@ -79,6 +81,9 @@
   if (['type', 'voice', 'bubble'].indexOf(prefs.mode) === -1) prefs.mode = defaults.mode;
   if (['two', 'mixed', 'three'].indexOf(prefs.level) === -1) prefs.level = defaults.level;
   if ([0, 10, 20, 30].indexOf(prefs.count) === -1) prefs.count = defaults.count;
+  if (['strong', 'standard', 'off'].indexOf(prefs.nearMode) === -1) prefs.nearMode = defaults.nearMode;
+  prefs.nearLevels = (Array.isArray(prefs.nearLevels) ? prefs.nearLevels : [])
+    .filter((level) => typeof level === 'number' && level > -100 && level < 0).slice(-5);
 
   function persist() {
     try {
@@ -196,7 +201,7 @@
       : supportsSpeech ? '浏览器识别 · 可能需要联网' : packRestriction ? '此浏览器不支持' : '先下载普通话语音包';
     el('voice-note').hidden = !voiceCard.disabled;
     el('voice-tip').hidden = prefs.mode !== 'voice';
-    el('voice-tip').textContent = offlineReady ? '将使用本机语音包。开始后允许麦克风，只说数字即可。' : '将使用浏览器语音服务，可能会联网。只说数字；如需离线识别可先安装语音包。';
+    el('voice-tip').textContent = offlineReady ? '将使用本机语音包，默认只听面前的说话声。开始后允许麦克风，只说数字即可。' : '将使用浏览器语音服务，可能会联网。只说数字；安装离线语音包后可离线识别，并过滤远处的人声。';
   }
 
   document.querySelectorAll('[data-mode]').forEach((button) => {
@@ -800,83 +805,54 @@
    * 语音识别
    * ------------------------------------------------------------------ */
 
-  const CN_DIGITS = {
-    '零': 0, '〇': 0, '一': 1, '壹': 1, '幺': 1, '二': 2, '贰': 2, '两': 2, '俩': 2,
-    '三': 3, '叁': 3, '四': 4, '肆': 4, '五': 5, '伍': 5, '六': 6, '陆': 6,
-    '七': 7, '柒': 7, '八': 8, '捌': 8, '九': 9, '玖': 9,
+  // 数字解析见 spoken-number.js：只接受合乎说法的完整数字（八十三、一百零五、两百五、八三、83）。
+
+  /* 近讲收音（仅离线语音）：只把面前的说话声送去识别，见 near-voice.js。 */
+  const NEAR_MODES = {
+    strong: ['只听面前', '只听贴近手机说的话，稍远的人声会被过滤'],
+    standard: ['近处说话', '一臂之内说话都能识别，更远的人声会被过滤'],
+    off: ['不过滤', '所有声音都送去识别，周围有人说话时易误识别'],
   };
-  const CN_UNITS = { '十': 10, '拾': 10, '百': 100, '佰': 100, '千': 1000, '仟': 1000 };
+  const NEAR_ORDER = ['strong', 'standard', 'off'];
+  let nearIgnored = 0;
+  let nearIgnoredMark = 0;
 
-  // 只接受完整的数字表达式；包含其他汉字或文字时不参与判分。
-  const NUMERIC_SPEECH = /^(?:[0-9]+|[零〇一壹幺二两俩贰三叁四肆五伍六陆七柒八捌九玖十拾百佰千仟]+)$/;
-
-  function normalizeSpeech(text) {
-    return String(text || '')
-      .replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
-      .replace(/[，,。.、！!？?：:；;“”"'‘’（）()《》\s]/g, '')
-      .replace(/[负]/g, '-');
+  function renderNearToggle() {
+    const label = NEAR_MODES[prefs.nearMode][0];
+    const button = el('near-toggle');
+    button.dataset.near = prefs.nearMode; // 不能用 data-mode：设置页的练习方式按钮靠它识别
+    button.setAttribute('aria-label', `收音范围：${label}，点按切换`);
+    el('near-toggle-label').textContent = `收音：${label}`;
+    el('near-count').textContent = prefs.nearMode !== 'off' && nearIgnored > 0 ? `已过滤 ${nearIgnored} 段` : '';
   }
 
-  function evaluateChineseNumber(run) {
-    if (!run) return null;
-    const hasUnit = /[十拾百佰千仟]/.test(run);
-    if (!hasUnit) {
-      if (run.length === 1) {
-        const digit = CN_DIGITS[run];
-        return digit === undefined ? null : digit;
-      }
-      let value = 0;
-      for (const ch of run) {
-        const digit = CN_DIGITS[ch];
-        if (digit === undefined) return null;
-        value = value * 10 + digit;
-      }
-      return value;
-    }
-
-    let total = 0;
-    let current = null;
-    for (const ch of run) {
-      const digit = CN_DIGITS[ch];
-      if (digit !== undefined) {
-        current = digit;
-        continue;
-      }
-      const unit = CN_UNITS[ch];
-      if (!unit) return null;
-      if (current === null) current = 1;
-      total += current * unit;
-      current = 0;
-    }
-
-    /* 口语省字：「两百五」是 250、「一千二」是 1200；带「零」或「十」时按字面算 */
-    const trailingDigit = current !== null && current > 0;
-    if (trailingDigit && !/[零〇十拾]/.test(run)) {
-      if (/[百佰]/.test(run)) return total + current * 10;
-      if (/[千仟]/.test(run)) return total + current * 100;
-    }
-
-    return total + (current || 0);
+  function resetNearMeter() {
+    el('near-level').style.transform = 'scaleX(0)';
+    el('near-mark').hidden = true;
+    setClass(el('near-meter'), 'is-open', false);
   }
 
-  function isNumericSpeech(text) {
-    return NUMERIC_SPEECH.test(normalizeSpeech(text));
-  }
-
-  function parseStrict(text) {
-    if (!isNumericSpeech(text)) return null;
-    const normalized = normalizeSpeech(text);
-    if (/^[0-9]+$/.test(normalized)) {
-      const value = Number(normalized);
-      return Number.isFinite(value) ? value : null;
+  // 音量条：-70 dBFS 到 -10 dBFS。竖线是门限，条变绿表示这段声音正送去识别。
+  function showNearMeter(meter) {
+    if (view !== 'practice' || prefs.mode !== 'voice' || !meter) return;
+    const ratio = (value) => Math.max(0, Math.min(1, (value + 70) / 60));
+    el('near-level').style.transform = `scaleX(${ratio(meter.level).toFixed(3)})`;
+    el('near-mark').hidden = meter.mode === 'off';
+    if (meter.mode !== 'off') el('near-mark').style.left = `${(ratio(meter.threshold) * 100).toFixed(1)}%`;
+    setClass(el('near-meter'), 'is-open', meter.open);
+    if (meter.ignored !== nearIgnored) {
+      nearIgnored = meter.ignored;
+      renderNearToggle();
     }
-    return evaluateChineseNumber(normalized);
   }
 
-  function parseSpokenNumber(text) {
-    const value = parseStrict(text);
-    // Even the largest supported exercise answer is below 2000.
-    return value !== null && value <= 1998 ? value : null;
+  // 答对时记下这次的说话音量。只在答对时记：远处的闲聊几乎不可能恰好说中答案，
+  // 门限因此跟着你自己的声音走，而不会被周围的人带偏。
+  function rememberVoiceLevel(level) {
+    if (typeof level !== 'number' || !isFinite(level)) return;
+    prefs.nearLevels = prefs.nearLevels.concat(level).slice(-5);
+    persist();
+    if (recognition && recognition.setNearVoice) recognition.setNearVoice({ voiceLevel: nearVoiceLevel(prefs.nearLevels) });
   }
 
   let recognition = null;
@@ -898,26 +874,35 @@
       micProblem = null;
       setVoiceState('listening');
     }
-    function transcript(alternatives, final) {
+    function transcript(alternatives, final, meta) {
       if (!active() || !alternatives.length || !alternatives[0].trim()) return;
       silenceCount = 0;
+      nearIgnoredMark = nearIgnored;
       const heard = alternatives[0].trim().replace(/<unk>/ig, '');
-      const numericHeard = isNumericSpeech(heard) ? normalizeSpeech(heard) : '';
+      const numericHeard = SpokenNumber.isNumeric(heard) ? SpokenNumber.normalize(heard) : '';
       if (el('heard-text').textContent !== numericHeard) el('heard-text').textContent = numericHeard;
       if (!final) return;
       for (const text of alternatives) {
-        if (!isNumericSpeech(text)) continue;
-        const value = parseSpokenNumber(text);
-        if (value !== null) { submit(value); return; }
+        const value = SpokenNumber.parse(text);
+        if (value === null) continue;
+        const question = session && session.current;
+        if (submit(value) && meta && question && value === question.answer) rememberVoiceLevel(meta.level);
+        return;
       }
-      setFeedback('只识别数字，请再说一次', 'bad');
+      setFeedback(numericHeard ? '没听清，请再说一次' : '只识别数字，请再说一次', 'bad');
     }
     function failed(code) {
       if (!active() || code === 'aborted') return;
       if (code === 'no-speech') {
         silenceCount += 1;
-        if (silenceCount >= 3) pausePrompt('没听到声音，点麦克风继续', '继续收音');
-        else setFeedback('没听到声音，再说一次', 'bad');
+        // 这段时间里过滤掉了较远处的声音：提示靠近手机，而不是说「没听到」。
+        const filtered = nearIgnored > nearIgnoredMark;
+        nearIgnoredMark = nearIgnored;
+        if (silenceCount >= 3) {
+          pausePrompt(filtered ? '只听到较远处的声音，已过滤。若是你在说，请靠近手机，或点「收音」放宽范围' : '没听到声音，点麦克风继续', '继续收音');
+        } else {
+          setFeedback(filtered ? '只听到远处的声音，请靠近手机再说' : '没听到声音，再说一次', 'bad');
+        }
       } else if (code === 'not-allowed' || code === 'service-not-allowed') {
         failVoice('麦克风没有打开。允许权限后重试，或改用打字作答。');
       } else if (code === 'audio-capture') {
@@ -931,7 +916,10 @@
       }
     }
     if (offlineReady) {
-      instance = OfflineVoice.listener({ start: started, text: transcript, error: failed });
+      nearIgnored = 0;
+      nearIgnoredMark = 0;
+      instance = OfflineVoice.listener({ start: started, text: transcript, error: failed, meter: showNearMeter },
+        { nearVoice: { mode: prefs.nearMode, voiceLevel: nearVoiceLevel(prefs.nearLevels) } });
       return instance;
     }
     instance = new Recognition();
@@ -994,6 +982,11 @@
     el('voice-actions').hidden = true;
     el('new-tab').hidden = !inFrame;
     el('voice-hint').textContent = '只说数字，识别后自动进入下一题；点麦克风可暂停';
+    // 近讲收音需要直接处理麦克风声音，只有离线语音可用。
+    el('near-meter').hidden = !offlineReady;
+    el('near-toggle').hidden = !offlineReady;
+    resetNearMeter();
+    renderNearToggle();
     el('feedback').className = 'feedback';
     setFeedback('看着题目，只说数字');
     setVoiceState('listening');
@@ -1116,6 +1109,24 @@
     } else {
       startVoice();
       setFeedback('看着题目，只说数字');
+    }
+  });
+
+  // 收音范围：只听面前 → 近处说话 → 不过滤。和麦克风按钮一样，反馈显示期间不响应。
+  el('near-toggle').addEventListener('click', () => {
+    if (view !== 'practice' || prefs.mode !== 'voice' || locked) return;
+    const next = NEAR_ORDER[(NEAR_ORDER.indexOf(prefs.nearMode) + 1) % NEAR_ORDER.length];
+    prefs.nearMode = next;
+    prefs.nearLevels = []; // 换了收音方式就重新校准：下一次答对时记下你的音量
+    persist();
+    renderNearToggle();
+    if (!micProblem) el('voice-hint').textContent = NEAR_MODES[next][1];
+    if (!recognition || !recognition.setNearVoice) return;
+    // 开 / 关过滤会改变麦克风的自动增益，要重新打开麦克风；趁这次点按做（iOS 要求用户手势）。
+    // 暂停时麦克风已经关闭，下次打开就会用新设置。
+    if (recognition.setNearVoice({ mode: next, voiceLevel: null }) && wantListen && !paused && !micProblem) {
+      abortMic();
+      listen();
     }
   });
 

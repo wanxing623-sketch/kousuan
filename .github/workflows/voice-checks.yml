@@ -38,6 +38,8 @@ jobs:
           python3 build.py
           git diff --exit-code -- index.html sw.js
           python3 build.py --site
+      - name: Near-voice gate and number parser (no browser)
+        run: node tests/unit.cjs
       - name: Prepare pinned test environment
         id: browsers
         working-directory: tests
