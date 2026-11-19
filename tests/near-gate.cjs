@@ -57,13 +57,15 @@ function opensWithin(gate, rms, blocks) {
   console.log('✓ near mode: syllable tails do not trigger mid-utterance finalization');
 }
 
-// 解码器就绪时若正处在句中，残句整段忽略；等到句子边界后的下一句才收
+// 解码器就绪时若正处在句中，残句整段忽略；残句结束後安静够久（长于字间停顿）才收下一句
 {
   const gate = NearGate.create('near');
   gate.reset();
   assert.equal(opensWithin(gate, 0.12, 10), false, 'mid-utterance fragment must be ignored before arming');
-  feed(gate, 0.001, 6); // 约 380 ms 安静，确认边界
-  assert.equal(opensWithin(gate, 0.12, 2), true, 'next full utterance opens after a quiet boundary');
+  feed(gate, 0.001, 6); // 约 380 ms 安静：对残句来说还不够（怕把下半句当完整答案）
+  assert.equal(opensWithin(gate, 0.12, 2), false, 'half an utterance after a fragment is still ignored');
+  feed(gate, 0.001, 10); // 再安静约 640 ms，确认句子边界
+  assert.equal(opensWithin(gate, 0.12, 2), true, 'full utterance opens once armed');
   console.log('✓ near mode: decoder starting mid-utterance ignores the fragment');
 }
 

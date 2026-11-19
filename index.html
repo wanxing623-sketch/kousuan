@@ -1395,6 +1395,7 @@ const NearGate = (() => {
     let open = false;
     let armed = true;       // 是否已确认处在句子边界；每次 reset（换解码器）后需重新确认
     let armMs = 0;
+    let fragment = false;   // reset 后、确认边界前已经听到过响声（多半是句中残句）
     let loudMs = 0;         // 已持续超过开门门槛的时间
     let quietMs = 0;        // 开门后持续低于关门门槛的时间
 
@@ -1407,6 +1408,7 @@ const NearGate = (() => {
       open = false;
       armed = false;
       armMs = 0;
+      fragment = false;
       loudMs = 0;
       quietMs = 0;
     }
@@ -1423,13 +1425,16 @@ const NearGate = (() => {
       let justClosed = false;
 
       if (!open && !armed) {
-        // 还没确认句子边界：句中残音一律不收，等响度回落并维持约 300 ms 才待命。
+        // 还没确认句子边界：句中残音一律不收。就绪时本来就安静，约 120 ms 即可待命，
+        // 随后开始的说话是完整的（开门有预录兜底）；就绪时已在句中，则残句结束後
+        // 要再安静约 600 ms（长于字间停顿）才待命，避免把下半句当成完整答案。
         loudMs = 0;
-        if (rms <= Math.max(0.009, floor * 1.6)) {
-          armMs += blockMs;
-          if (armMs >= 300) armed = true;
-        } else {
+        if (rms > Math.max(0.009, floor * 1.6)) {
           armMs = 0;
+          fragment = true;
+        } else {
+          armMs += blockMs;
+          if (armMs >= (fragment ? 600 : 120)) armed = true;
         }
         if (rms < on) {
           if (rms < floor) floor = floor * 0.94 + rms * 0.06;
