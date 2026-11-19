@@ -8,7 +8,7 @@
    * 对不上就带参数重新取一次页面。
    * ------------------------------------------------------------------ */
 
-  const REQUIRED_IDS = ['welcome', 'pack-button', 'setup', 'practice', 'results', 'answer-form', 'question', 'voice-button', 'bubble-area', 'bubble-field'];
+  const REQUIRED_IDS = ['welcome', 'pack-button', 'setup', 'practice', 'results', 'answer-form', 'question', 'voice-button', 'bubble-area', 'bubble-field', 'mic-group', 'mic-setup-note', 'mic-meter', 'mic-track', 'mic-fill', 'mic-threshold', 'mic-state', 'mic-note', 'mic-switch'];
   const domMatches = REQUIRED_IDS.every((id) => document.getElementById(id));
   if (!domMatches) {
     if (location.search.indexOf('fresh=') === -1) {
@@ -44,7 +44,7 @@
   const inFrame = window.self !== window.top;
   const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
-  const defaults = { mode: 'type', level: 'two', count: 10, welcomed: false, voiceEngine: 'browser' };
+  const defaults = { mode: 'type', level: 'two', count: 10, welcomed: false, voiceEngine: 'browser', micMode: 'near' };
   let prefs = Object.assign({}, defaults);
   let best = {};
 
@@ -77,6 +77,7 @@
   }
 
   if (['type', 'voice', 'bubble'].indexOf(prefs.mode) === -1) prefs.mode = defaults.mode;
+  if (['near', 'standard'].indexOf(prefs.micMode) === -1) prefs.micMode = defaults.micMode;
   if (['two', 'mixed', 'three'].indexOf(prefs.level) === -1) prefs.level = defaults.level;
   if ([0, 10, 20, 30].indexOf(prefs.count) === -1) prefs.count = defaults.count;
 
@@ -180,6 +181,15 @@
       setClass(button, 'selected', on);
       button.setAttribute('aria-pressed', String(on));
     });
+    document.querySelectorAll('[data-mic]').forEach((button) => {
+      const on = button.dataset.mic === prefs.micMode;
+      setClass(button, 'selected', on);
+      button.setAttribute('aria-pressed', String(on));
+    });
+    el('mic-group').hidden = prefs.mode !== 'voice';
+    el('mic-setup-note').textContent = offlineReady
+      ? '只听近处只把明显比环境响、且持续一小段的声音送去识别，需把手机拿近嘴边；练习中也能随时切换。'
+      : '只听近处需要离线语音包；未装包时的浏览器语音服务由浏览器直接收音，无法在本地挡住远处声音。';
     document.querySelectorAll('[data-level]').forEach((button) => {
       const on = button.dataset.level === prefs.level;
       setClass(button, 'selected', on);
@@ -208,6 +218,14 @@
       }
       prefs.mode = button.dataset.mode;
       if (prefs.mode === 'voice') prefs.voiceEngine = offlineReady ? 'offline' : 'browser';
+      syncSetup();
+      persist();
+    });
+  });
+
+  document.querySelectorAll('[data-mic]').forEach((button) => {
+    button.addEventListener('click', () => {
+      prefs.micMode = button.dataset.mic;
       syncSetup();
       persist();
     });
@@ -930,8 +948,29 @@
         failVoice('语音识别出了点问题，可以重试或改用打字作答。');
       }
     }
+    function voiceLevel(info) {
+      // 音量条用 dB 标度：约 -55 dB（安静）到 -5 dB（很响）；橙线是当前开门门槛。
+      const percent = (rms) => {
+        const db = 20 * Math.log10(Math.max(rms, 0.00001));
+        return Math.max(0, Math.min(100, (db + 55) / 50 * 100));
+      };
+      el('mic-fill').style.width = `${percent(info.rms)}%`;
+      el('mic-threshold').style.left = `${percent(info.threshold)}%`;
+      setClass(el('mic-track'), 'is-open', info.open);
+      const state = info.open ? '正在收你的声音'
+        : info.armed === false && info.audible ? '先等周围安静一下'
+          : info.audible ? '远处声音已挡住'
+            : info.mode === 'near' ? '只听近处 · 等你说话' : '标准收音 · 等你说话';
+      if (el('mic-state').textContent !== state) el('mic-state').textContent = state;
+      const note = info.open ? '正在收音，只说数字即可。'
+        : info.armed === false && info.audible ? '正在等句子边界，安静一下就会开始收音，不会把半句话当答案。'
+          : info.audible ? '刚听到的声音较小，没有送去识别；请把手机拿近嘴边再说。'
+          : info.mode === 'near' ? '把手机拿到嘴边约一掌（15–25 厘米）只说数字；音量越过橙线才会识别。'
+            : '标准收音灵敏度更高；周围有人说话时建议切回「只听近处」。';
+      if (el('mic-note').textContent !== note) el('mic-note').textContent = note;
+    }
     if (offlineReady) {
-      instance = OfflineVoice.listener({ start: started, text: transcript, error: failed });
+      instance = OfflineVoice.listener({ start: started, text: transcript, error: failed, level: voiceLevel }, { micMode: prefs.micMode });
       return instance;
     }
     instance = new Recognition();
@@ -983,8 +1022,21 @@
     }, delay);
   }
 
+  function updateMicUI() {
+    const near = prefs.micMode === 'near';
+    el('mic-switch').textContent = near ? '只听近处：开 · 切到标准收音' : '只听近处：关 · 切到只听近处';
+    el('mic-meter').hidden = !offlineReady;
+    el('mic-state').textContent = near ? '只听近处 · 等你说话' : '标准收音 · 等你说话';
+    el('mic-note').textContent = !offlineReady
+      ? (near ? '浏览器语音服务无法过滤远处声音；装好离线语音包后用「只听近处」效果最好。' : '浏览器语音服务由浏览器直接收音，灵敏度无法调整。')
+      : near ? '把手机拿到嘴边约一掌（15–25 厘米）只说数字；音量越过橙线才会识别。'
+        : '标准收音灵敏度更高；周围有人说话时建议切回「只听近处」。';
+    el('mic-fill').style.width = '0%';
+  }
+
   function startVoice() {
     el('voice-engine').textContent = offlineReady ? '离线语音 · 普通话' : '浏览器语音服务';
+    updateMicUI();
     wantListen = true;
     paused = false;
     micProblem = null;
@@ -1010,6 +1062,7 @@
 
   function pauseVoice(release) {
     paused = true;
+    el('mic-fill').style.width = '0%';
     clearTimeout(restartTimer);
     if (release) abortMic();
     else if (recognition && recognition.hold) recognition.hold();
@@ -1128,6 +1181,16 @@
     el('voice-hint').textContent = '只说数字，识别后自动进入下一题；点麦克风可暂停';
     setVoiceState('listening');
     listen();
+  });
+
+  el('mic-switch').addEventListener('click', () => {
+    if (view !== 'practice' || prefs.mode !== 'voice' || locked) return;
+    prefs.micMode = prefs.micMode === 'near' ? 'standard' : 'near';
+    persist();
+    syncSetup();
+    stopVoice();
+    startVoice();
+    setFeedback(prefs.micMode === 'near' ? '已开启只听近处，请把手机拿近嘴边说' : '已切到标准收音，灵敏度更高');
   });
 
   el('new-tab').addEventListener('click', () => {

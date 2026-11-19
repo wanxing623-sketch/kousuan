@@ -68,7 +68,7 @@ def main():
     pack = json.dumps(files, separators=(',', ':'))
     store = read('voice-store.js')
     physics = (ROOT / 'third_party' / 'matter-js' / 'matter.min.js').read_text(encoding='utf-8')
-    js = physics + '\n' + store + '\n' + read('offline.js').replace('/*@files*/[]', pack) + '\n' + read('app.js')
+    js = physics + '\n' + store + '\n' + read('near-gate.js') + '\n' + read('offline.js').replace('/*@files*/[]', pack) + '\n' + read('app.js')
     html = read('page.html').replace('<!--@styles-->', '<style>\n' + escape(read('styles.css')) + '  </style>')
     html = html.replace('<!--@app-->', '<script>\n' + escape(js) + '\n  </script>')
     if '<!--@' in html:

@@ -45,7 +45,7 @@ async function fixQuestion(page) {
   });
 }
 async function noLiveMic(page) {
-  await page.waitForFunction(() => window.tracks.every(t => t.readyState === 'ended'));
+  await page.waitForFunction(() => window.tracks.every(t => t.readyState === 'ended'), null, { timeout: 34000 });
 }
 
 async function testOffline(browser, base) {
@@ -103,7 +103,7 @@ async function testOffline(browser, base) {
   const wrongValue = await page.locator('#bubble-field .number-bubble').evaluateAll(nodes => nodes.find(node => node.textContent !== '83').textContent);
   await page.getByRole('button', { name: `数字 ${wrongValue}` }).click({ force: true });
   assert.match(await page.textContent('#feedback'), /再找找/);
-  await page.waitForFunction(() => document.querySelectorAll('#bubble-field .number-bubble').length === 8);
+  await page.waitForFunction(() => document.querySelectorAll('#bubble-field .number-bubble').length === 8, null, { timeout: 32000 });
   assert.equal(await page.textContent('#score-label'), '答对 0 题');
   await page.getByRole('button', { name: '数字 83' }).click({ force: true });
   assert.equal(await page.textContent('#score-label'), '答对 1 题');
@@ -139,6 +139,8 @@ async function testOffline(browser, base) {
   await page.click('#manage-pack');
   await state('ready');
   await page.click('#pack-button');
+  assert(await page.isVisible('#mic-group'), 'mic range settings show for voice mode');
+  assert.equal(await page.getAttribute('[data-mic="near"]', 'aria-pressed'), 'true', 'near-field gate is the default');
   await fixQuestion(page);
   await page.evaluate(() => { window.refuseMic = true; });
   await page.click('#start-button');
@@ -146,8 +148,39 @@ async function testOffline(browser, base) {
   assert.match(await page.textContent('#voice-hint'), /权限/);
   await page.evaluate(() => { window.refuseMic = false; });
   await page.click('#voice-retry');
-  await page.waitForFunction(() => document.querySelector('#score-label').textContent === '答对 1 题', null, { timeout: 60000 });
-  await page.waitForFunction(() => document.querySelector('#progress-label').textContent === '第 2 / 10 题');
+  await page.evaluate(() => {
+    // 采样门控历史：等待期间音量最大值、是否开过门/挡过声音，失败时随报错带出
+    const diag = window.__micDiag = { maxFill: 0, maxThr: 0, sawOpen: false, sawBlocked: false, heard: '', feedbackSeen: [] };
+    diag.timer = setInterval(() => {
+      const fill = parseFloat(document.querySelector('#mic-fill').style.width) || 0;
+      const thr = parseFloat(document.querySelector('#mic-threshold').style.left) || 0;
+      const state = document.querySelector('#mic-state').textContent;
+      diag.maxFill = Math.max(diag.maxFill, fill);
+      diag.maxThr = Math.max(diag.maxThr, thr);
+      if (state.includes('正在收你的声音')) diag.sawOpen = true;
+      if (state.includes('已挡住')) diag.sawBlocked = true;
+      diag.heard = document.querySelector('#heard-text').textContent || diag.heard;
+      diag.progress = document.querySelector('#progress-label').textContent;
+      diag.feedback = document.querySelector('#feedback').textContent;
+      if (diag.feedback && !diag.feedbackSeen.includes(diag.feedback)) diag.feedbackSeen.push(diag.feedback);
+      // 只记第一次判错瞬间的识别文字（后续题目都会被覆盖）：那是首题提交的值
+      if (!diag.given && diag.feedback.startsWith('正确答案是')) diag.given = document.querySelector('#heard-text').textContent;
+    }, 100);
+  });
+  try {
+    await page.waitForFunction(() => document.querySelector('#score-label').textContent === '答对 1 题', null, { timeout: 60000 });
+  } catch (error) {
+    const diag = await page.evaluate(() => window.__micDiag && {
+      maxFill: window.__micDiag.maxFill, maxThr: window.__micDiag.maxThr,
+      sawOpen: window.__micDiag.sawOpen, sawBlocked: window.__micDiag.sawBlocked,
+      heard: window.__micDiag.heard, progress: window.__micDiag.progress,
+      feedbackSeen: window.__micDiag.feedbackSeen, given: window.__micDiag.given,
+    }).catch(() => null);
+    throw new Error(`voice answer not scored; mic diag: ${JSON.stringify(diag)}`);
+  }
+  await page.waitForFunction(() => document.querySelector('#progress-label').textContent === '第 2 / 10 题', null, { timeout: 33000 });
+  assert(await page.isVisible('#mic-meter'), 'live mic level meter shows in voice practice');
+  assert.match(await page.textContent('#mic-switch'), /只听近处：开/);
   console.log('✓ offline cold start and permission retry; real Chinese WAV → Vosk WASM → 83 → next question');
 
   await page.click('#voice-button');
@@ -166,7 +199,7 @@ async function testOffline(browser, base) {
   const trackCount = await page.evaluate(() => window.tracks.length);
   await page.click('#switch-mode'); // leave while the permission request is pending
   await page.evaluate(() => window.grantMic());
-  await page.waitForFunction(n => window.tracks.length > n, trackCount);
+  await page.waitForFunction(n => window.tracks.length > n, trackCount, { timeout: 35000 });
   await noLiveMic(page);
   await page.click('#quit-button');
   assert.equal(await page.textContent('#result-correct'), '1');

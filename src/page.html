@@ -79,6 +79,21 @@
         <p class="support-note tip" id="voice-tip" hidden>开始后请允许麦克风，只说数字即可。</p>
       </fieldset>
 
+      <fieldset class="setting-group" id="mic-group" hidden>
+        <legend>收音范围</legend>
+        <div class="mode-grid">
+          <button class="mode-card selected" type="button" data-mic="near" aria-pressed="true">
+            <span class="mode-copy"><strong>只听近处</strong><small>周围有人说话时用，手机拿近嘴边说</small></span>
+            <span class="radio-dot" aria-hidden="true"></span>
+          </button>
+          <button class="mode-card" type="button" data-mic="standard" aria-pressed="false">
+            <span class="mode-copy"><strong>标准收音</strong><small>周围安静时用，灵敏度更高</small></span>
+            <span class="radio-dot" aria-hidden="true"></span>
+          </button>
+        </div>
+        <p class="support-note" id="mic-setup-note">只听近处只把明显比环境响、且持续一小段的声音送去识别，需把手机拿近嘴边；练习中也能随时切换。</p>
+      </fieldset>
+
       <fieldset class="setting-group">
         <legend>题目难度</legend>
         <div class="difficulty-grid">
@@ -163,11 +178,17 @@
             <span id="voice-label">正在聆听…</span>
           </button>
           <p id="heard-text" class="heard-text" aria-live="polite"></p>
+          <div id="mic-meter" class="mic-meter" hidden>
+            <div class="mic-meter-head"><span>收音音量</span><span id="mic-state">只听近处 · 等你说话</span></div>
+            <div class="mic-track" id="mic-track"><span id="mic-fill"></span><span id="mic-threshold" title="识别门槛"></span></div>
+          </div>
+          <p id="mic-note" class="mic-note">把手机拿到嘴边约一掌（15–25 厘米）只说数字；音量越过橙线才会识别。</p>
           <p id="voice-hint" class="voice-hint">说完答案会自动进入下一题，点麦克风可暂停</p>
           <div id="voice-actions" class="voice-actions" hidden>
             <button id="voice-retry" class="mini-button" type="button">重新打开麦克风</button>
             <button id="new-tab" class="mini-button" type="button" hidden>在新窗口打开</button>
           </div>
+          <button id="mic-switch" class="voice-switch" type="button">只听近处：开 · 切到标准收音</button>
           <button id="switch-mode" class="voice-switch" type="button">改用打字作答</button>
         </div>
       </div>

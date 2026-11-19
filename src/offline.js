@@ -124,10 +124,16 @@ const OfflineVoice = (() => {
   }
 
   // 一个练习会话只建一个模型；每道题一个解码器，前一题排队的结果不能串到下一题。
-  function listener(events) {
+  // options.micMode: 'near' 只听近处（默认） | 'standard' 标准收音。见 near-gate.js。
+  function listener(events, options) {
     const grammar = numberGrammar();
+    const micMode = options && options.micMode === 'standard' ? 'standard' : 'near';
+    const gate = typeof NearGate !== 'undefined' ? NearGate.create(micMode) : null;
     let model, loading, cancelLoad, capture, decoder, silenceTimer;
     let disposed = false;
+    let preRoll = [];
+    let preRollMs = 0;
+    let lastLevelAt = 0;
     function freeModel() {
       if (!model) return;
       // 0.0.8 的 terminate() 向 worker 发消息删除已构造的模型。加载失败时模型尚不存在。
@@ -180,6 +186,9 @@ const OfflineVoice = (() => {
       voiceStartedAt = 0;
       lastVoiceAt = 0;
       finalRequested = false;
+      if (gate) gate.reset();
+      preRoll = [];
+      preRollMs = 0;
       function heard(text, final) {
         if (d !== decoder) return;
         if (final) {
@@ -213,7 +222,12 @@ const OfflineVoice = (() => {
         try { c.ctx = new Audio({ sampleRate: 16000 }); }
         catch (_) { c.ctx = new Audio(); }
         const unlock = c.ctx.resume();
-        const permission = navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: { ideal: 16000 }, echoCancellation: true, noiseSuppression: true }, video: false })
+        // 自动增益保留开启：实测关掉后 Chromium 的音频管线会让一句话的首字
+        // 解码失真（端到端用例稳定复现），且各设备麦克风增益差异大、关掉后
+        // 响度绝对值不可靠。远近改由近讲门控按「相对底噪的响度 + 持续性」
+        // 区分；用户近讲时增益会被近声压低，这段时间远处声音更难开门。
+        // 噪声抑制/回声消除继续开，压低风扇、电视底噪这类非人声干扰。
+        const permission = navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: { ideal: 16000 }, echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false })
           .then(stream => {
             if (c !== capture) { stream.getTracks().forEach(track => track.stop()); return; }
             c.stream = stream;
@@ -232,25 +246,68 @@ const OfflineVoice = (() => {
           if (c !== capture || !decoder) return;
           try {
             const buffer = event.inputBuffer;
-            decoder.acceptWaveform(buffer);
-
-            // Finalize after a short quiet tail instead of waiting for Vosk's more
-            // conservative endpoint timeout. Sample the RMS cheaply on-device.
             const samples = buffer.getChannelData(0);
-            let energy = 0, count = 0;
-            for (let i = 0; i < samples.length; i += 4) {
-              energy += samples[i] * samples[i];
-              count += 1;
+            let energy = 0, peak = 0;
+            for (let i = 0; i < samples.length; i += 1) {
+              const value = samples[i];
+              energy += value * value;
+              const level = value < 0 ? -value : value;
+              if (level > peak) peak = level;
             }
             const now = performance.now();
-            const rms = Math.sqrt(energy / Math.max(1, count));
-            if (rms >= 0.008) {
-              if (!voiceStartedAt || finalRequested) voiceStartedAt = now;
+            const rms = Math.sqrt(energy / Math.max(1, samples.length));
+            const blockMs = samples.length / c.ctx.sampleRate * 1000;
+            const gateState = gate ? gate.update(rms, blockMs)
+              : { open: true, armed: true, justOpened: false, justClosed: false, threshold: 0.008, audible: rms >= 0.008 };
+
+            if (events.level && (now - lastLevelAt >= 120 || gateState.justOpened || gateState.justClosed)) {
+              lastLevelAt = now;
+              try {
+                events.level({ rms, peak, threshold: gateState.threshold, open: gateState.open, armed: gateState.armed, audible: gateState.audible, mode: micMode });
+              } catch (_) { /* 界面更新失败不影响识别 */ }
+            }
+
+            if (!gateState.open && !gateState.justClosed) {
+              // 门没开：不把原声送给识别器，远处说得再清楚也不会被当成答案；
+              // 改喂等长静音，解码器的时间轴和特征归一化保持连续（与一直开麦时
+              // 一致），不会因裁剪拼接音频而丢掉一句话的首字。另留最近约 320 ms
+              // 预录，等近处声音开门时补送，避免吞掉第一个字。
+              preRoll.push(new Float32Array(samples));
+              preRollMs += blockMs;
+              while (preRoll.length > 1 && preRollMs > 320) preRollMs -= preRoll.shift().length / c.ctx.sampleRate * 1000;
+              if (!c.silence || c.silence.length !== samples.length) c.silence = c.ctx.createBuffer(1, samples.length, c.ctx.sampleRate);
+              decoder.acceptWaveform(c.silence);
+              // 远处一直有人说话不算「没声音」：推迟无声提示，界面会提示已被挡住。
+              if (gateState.audible) armSilence();
+              return;
+            }
+
+            if (gateState.justOpened) {
+              preRoll.push(new Float32Array(samples));
+              preRoll.forEach(data => {
+                const pre = c.ctx.createBuffer(1, data.length, c.ctx.sampleRate);
+                pre.getChannelData(0).set(data);
+                decoder.acceptWaveform(pre);
+              });
+              preRoll = [];
+              preRollMs = 0;
+              voiceStartedAt = now;
               finalRequested = false;
               lastVoiceAt = now;
-            } else if (voiceStartedAt && !finalRequested && now - voiceStartedAt >= 120
-              && now - lastVoiceAt >= 420) {
+            } else {
+              decoder.acceptWaveform(buffer);
+              if (rms >= (gateState.offThreshold || gateState.threshold * 0.55)) {
+                if (!voiceStartedAt || finalRequested) { voiceStartedAt = now; finalRequested = false; }
+                lastVoiceAt = now;
+              }
+            }
+
+            // 门因句末停顿关上（或无门控时的短静音）就请求最终结果，
+            // 不等 Vosk 默认的、更保守的端点超时。
+            if (!finalRequested && voiceStartedAt && now - voiceStartedAt >= 100
+              && (gateState.justClosed || now - lastVoiceAt >= 420)) {
               finalRequested = true;
+              voiceStartedAt = 0;
               decoder.retrieveFinalResult();
             }
           } catch (_) { events.error('offline-engine'); }
