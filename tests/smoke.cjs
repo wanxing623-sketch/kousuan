@@ -148,7 +148,21 @@ async function testOffline(browser, base) {
   assert.match(await page.textContent('#voice-hint'), /权限/);
   await page.evaluate(() => { window.refuseMic = false; });
   await page.click('#voice-retry');
-  await page.waitForFunction(() => document.querySelector('#score-label').textContent === '答对 1 题', null, { timeout: 60000 });
+  try {
+    await page.waitForFunction(() => document.querySelector('#score-label').textContent === '答对 1 题', null, { timeout: 60000 });
+  } catch (error) {
+    // 把门控现场打包进报错，CI 注解里能直接看到是「门没开」还是「识别没出字」
+    const diag = await page.evaluate(() => ({
+      fill: document.querySelector('#mic-fill').style.width,
+      thr: document.querySelector('#mic-threshold').style.left,
+      state: document.querySelector('#mic-state').textContent,
+      note: document.querySelector('#mic-note').textContent,
+      heard: document.querySelector('#heard-text').textContent,
+      feedback: document.querySelector('#feedback').textContent,
+      label: document.querySelector('#voice-label').textContent,
+    })).catch(() => null);
+    throw new Error(`voice answer not scored; mic diag: ${JSON.stringify(diag)}`);
+  }
   await page.waitForFunction(() => document.querySelector('#progress-label').textContent === '第 2 / 10 题');
   assert(await page.isVisible('#mic-meter'), 'live mic level meter shows in voice practice');
   assert.match(await page.textContent('#mic-switch'), /只听近处：开/);
