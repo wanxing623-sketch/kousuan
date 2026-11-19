@@ -539,6 +539,59 @@ button { cursor: pointer; }
   color: var(--muted-2);
 }
 
+.mic-meter {
+  max-width: 340px;
+  margin: 10px auto 0;
+  text-align: left;
+}
+
+.mic-meter-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.mic-meter-head span:last-child { font-weight: 700; color: #46634d; }
+
+.mic-track {
+  position: relative;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 99px;
+  background: #e8ece7;
+  overflow: hidden;
+}
+
+#mic-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: #9db8a4;
+  transition: width .12s linear, background-color .15s ease;
+}
+
+.mic-track.is-open #mic-fill { background: var(--green); }
+
+#mic-threshold {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background: var(--orange);
+}
+
+.mic-note {
+  max-width: 420px;
+  min-height: 17px;
+  margin: 7px auto 0;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
 .voice-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1107,6 +1160,21 @@ body { background: #f5f6f3; }
         <p class="support-note tip" id="voice-tip" hidden>开始后请允许麦克风，只说数字即可。</p>
       </fieldset>
 
+      <fieldset class="setting-group" id="mic-group" hidden>
+        <legend>收音范围</legend>
+        <div class="mode-grid">
+          <button class="mode-card selected" type="button" data-mic="near" aria-pressed="true">
+            <span class="mode-copy"><strong>只听近处</strong><small>周围有人说话时用，手机拿近嘴边说</small></span>
+            <span class="radio-dot" aria-hidden="true"></span>
+          </button>
+          <button class="mode-card" type="button" data-mic="standard" aria-pressed="false">
+            <span class="mode-copy"><strong>标准收音</strong><small>周围安静时用，灵敏度更高</small></span>
+            <span class="radio-dot" aria-hidden="true"></span>
+          </button>
+        </div>
+        <p class="support-note" id="mic-setup-note">只听近处会关掉自动增益、只把近处响亮的声音送去识别，需把手机拿近嘴边；练习中也能随时切换。</p>
+      </fieldset>
+
       <fieldset class="setting-group">
         <legend>题目难度</legend>
         <div class="difficulty-grid">
@@ -1191,11 +1259,17 @@ body { background: #f5f6f3; }
             <span id="voice-label">正在聆听…</span>
           </button>
           <p id="heard-text" class="heard-text" aria-live="polite"></p>
+          <div id="mic-meter" class="mic-meter" hidden>
+            <div class="mic-meter-head"><span>收音音量</span><span id="mic-state">只听近处 · 等你说话</span></div>
+            <div class="mic-track" id="mic-track"><span id="mic-fill"></span><span id="mic-threshold" title="识别门槛"></span></div>
+          </div>
+          <p id="mic-note" class="mic-note">把手机拿到嘴边约一掌（15–25 厘米）只说数字；音量越过橙线才会识别。</p>
           <p id="voice-hint" class="voice-hint">说完答案会自动进入下一题，点麦克风可暂停</p>
           <div id="voice-actions" class="voice-actions" hidden>
             <button id="voice-retry" class="mini-button" type="button">重新打开麦克风</button>
             <button id="new-tab" class="mini-button" type="button" hidden>在新窗口打开</button>
           </div>
+          <button id="mic-switch" class="voice-switch" type="button">只听近处：开 · 切到标准收音</button>
           <button id="switch-mode" class="voice-switch" type="button">改用打字作答</button>
         </div>
       </div>
@@ -1292,6 +1366,101 @@ function createVoiceStore(base) {
   }
   return { has, match, put, putResponse };
 }
+
+/* 近讲门控（near-field gate）：只把「离麦克风近、明显比环境底噪响」的声音送给识别器。
+ *
+ * 原理：单麦克风分不清方向，但近处说话比远处说话响得多（距离每远一倍约弱 6 dB）。
+ * 浏览器自动增益（AGC）会把远处人声放大到和近处一样响，所以近讲档要关掉 AGC，
+ * 再用这里的门控按响度筛选：持续估计环境底噪，只有响度超过 max(绝对下限, 底噪×倍数)
+ * 并维持一小段时间的声音才开门，开门前的预录音频会一并补送，避免吞掉第一个字。
+ * 这借鉴了开源 VAD（如 Silero VAD / WebRTC VAD）「先判活再识别」的思路，但判的不是
+ * 「是不是人声」，而是「够不够近」——远处的人声同样是人声，普通 VAD/降噪挡不住。
+ *
+ * 纯函数式实现，不依赖 DOM，可在 Node 里直接单测（tests/near-gate.cjs）。 */
+const NearGate = (() => {
+  'use strict';
+
+  const PROFILES = {
+    /* 标准收音：灵敏度优先，适合安静环境、手机放得稍远 */
+    standard: { minOn: 0.012, maxOn: 0.07, ratio: 2.2, onsetMs: 50, floorCap: 0.05 },
+    /* 只听近处：响度门槛高且随底噪抬升，适合周围有人说话时手持近讲 */
+    near: { minOn: 0.045, maxOn: 0.16, ratio: 4, onsetMs: 96, floorCap: 0.08 },
+  };
+
+  const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+  function create(profileName) {
+    const profile = PROFILES[profileName] || PROFILES.standard;
+    let floor = 0.008;      // 环境底噪 RMS 估计，随安静/嘈杂缓慢自适应
+    let open = false;
+    let loudMs = 0;         // 已持续超过开门门槛的时间
+    let quietMs = 0;        // 开门后持续低于关门门槛的时间
+
+    const threshold = () => clamp(floor * profile.ratio, profile.minOn, profile.maxOn);
+
+    function reset() {
+      // 每道题换解码器时调用：关门并清计时，但保留已学到的底噪，避免重新适应时误收。
+      open = false;
+      loudMs = 0;
+      quietMs = 0;
+    }
+
+    /* rms: 本块（约几十毫秒）的均方根响度；blockMs: 本块时长。
+     * 返回 { open, justOpened, justClosed, threshold, floor, audible }
+     * audible 表示「有明显高于底噪的声音，但还没响到能开门」——多半是被挡住的远处声音。 */
+    function update(rms, blockMs) {
+      const on = threshold();
+      const off = on * 0.55;
+      let justOpened = false;
+      let justClosed = false;
+
+      if (!open) {
+        if (rms >= on) {
+          // 不要求严格连续：语音块响度起伏时允许衰减累计，避免永远差一点开不了门。
+          loudMs += blockMs;
+          if (loudMs >= profile.onsetMs) {
+            open = true;
+            justOpened = true;
+            loudMs = 0;
+            quietMs = 0;
+          }
+        } else {
+          loudMs = Math.max(0, loudMs - blockMs);
+          // 只在门外且声音低于门槛时学底噪：安静时学得快，嘈杂时学得慢，
+          // 远处持续说话会把门槛越抬越高，而不是被当成要识别的内容。
+          if (rms < floor) floor = floor * 0.94 + rms * 0.06;
+          else floor = floor * 0.985 + rms * 0.015;
+          floor = clamp(floor, 0.0015, profile.floorCap);
+        }
+      } else if (rms >= off) {
+        quietMs = 0;
+      } else {
+        quietMs += blockMs;
+        if (quietMs >= 450) { // 句末停顿约 450 ms 后关门，尾巴的远处声音不再送入
+          open = false;
+          justClosed = true;
+          quietMs = 0;
+          loudMs = 0;
+        }
+      }
+
+      return {
+        open,
+        justOpened,
+        justClosed,
+        threshold: threshold(),
+        floor,
+        audible: rms >= Math.max(0.012, floor * 1.6),
+      };
+    }
+
+    return { update, reset, threshold, profile: profileName in PROFILES ? profileName : 'standard' };
+  }
+
+  return { create, PROFILES };
+})();
+
+if (typeof module !== 'undefined' && module.exports) module.exports = NearGate;
 
 /* 按需安装的 Vosk 离线识别。打字和浏览器原生语音都不加载第三方脚本。 */
 const OfflineVoice = (() => {
@@ -1419,10 +1588,16 @@ const OfflineVoice = (() => {
   }
 
   // 一个练习会话只建一个模型；每道题一个解码器，前一题排队的结果不能串到下一题。
-  function listener(events) {
+  // options.micMode: 'near' 只听近处（默认） | 'standard' 标准收音。见 near-gate.js。
+  function listener(events, options) {
     const grammar = numberGrammar();
+    const micMode = options && options.micMode === 'standard' ? 'standard' : 'near';
+    const gate = typeof NearGate !== 'undefined' ? NearGate.create(micMode) : null;
     let model, loading, cancelLoad, capture, decoder, silenceTimer;
     let disposed = false;
+    let preRoll = [];
+    let preRollMs = 0;
+    let lastLevelAt = 0;
     function freeModel() {
       if (!model) return;
       // 0.0.8 的 terminate() 向 worker 发消息删除已构造的模型。加载失败时模型尚不存在。
@@ -1475,6 +1650,9 @@ const OfflineVoice = (() => {
       voiceStartedAt = 0;
       lastVoiceAt = 0;
       finalRequested = false;
+      if (gate) gate.reset();
+      preRoll = [];
+      preRollMs = 0;
       function heard(text, final) {
         if (d !== decoder) return;
         if (final) {
@@ -1508,7 +1686,10 @@ const OfflineVoice = (() => {
         try { c.ctx = new Audio({ sampleRate: 16000 }); }
         catch (_) { c.ctx = new Audio(); }
         const unlock = c.ctx.resume();
-        const permission = navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: { ideal: 16000 }, echoCancellation: true, noiseSuppression: true }, video: false })
+        // 只听近处时必须关掉自动增益：AGC 会把远处人声放大到和近处一样响，
+        // 近讲门控就分不出远近了。标准收音保留 AGC，手机放远时也能听清。
+        // 噪声抑制/回声消除继续开，压低风扇、电视底噪这类非人声干扰。
+        const permission = navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: { ideal: 16000 }, echoCancellation: true, noiseSuppression: true, autoGainControl: micMode !== 'near' }, video: false })
           .then(stream => {
             if (c !== capture) { stream.getTracks().forEach(track => track.stop()); return; }
             c.stream = stream;
@@ -1527,25 +1708,64 @@ const OfflineVoice = (() => {
           if (c !== capture || !decoder) return;
           try {
             const buffer = event.inputBuffer;
-            decoder.acceptWaveform(buffer);
-
-            // Finalize after a short quiet tail instead of waiting for Vosk's more
-            // conservative endpoint timeout. Sample the RMS cheaply on-device.
             const samples = buffer.getChannelData(0);
-            let energy = 0, count = 0;
-            for (let i = 0; i < samples.length; i += 4) {
-              energy += samples[i] * samples[i];
-              count += 1;
+            let energy = 0, peak = 0;
+            for (let i = 0; i < samples.length; i += 1) {
+              const value = samples[i];
+              energy += value * value;
+              const level = value < 0 ? -value : value;
+              if (level > peak) peak = level;
             }
             const now = performance.now();
-            const rms = Math.sqrt(energy / Math.max(1, count));
-            if (rms >= 0.008) {
-              if (!voiceStartedAt || finalRequested) voiceStartedAt = now;
+            const rms = Math.sqrt(energy / Math.max(1, samples.length));
+            const blockMs = samples.length / c.ctx.sampleRate * 1000;
+            const gateState = gate ? gate.update(rms, blockMs)
+              : { open: true, justOpened: false, justClosed: false, threshold: 0.008, audible: rms >= 0.008 };
+
+            if (events.level && (now - lastLevelAt >= 120 || gateState.justOpened || gateState.justClosed)) {
+              lastLevelAt = now;
+              try {
+                events.level({ rms, peak, threshold: gateState.threshold, open: gateState.open, audible: gateState.audible, mode: micMode });
+              } catch (_) { /* 界面更新失败不影响识别 */ }
+            }
+
+            if (!gateState.open && !gateState.justClosed) {
+              // 门没开：不把音频送给识别器，远处说得再清楚也不会被当成答案。
+              // 只留最近约 320 ms 预录，等近处声音开门时补送，避免吞掉第一个字。
+              preRoll.push(new Float32Array(samples));
+              preRollMs += blockMs;
+              while (preRoll.length > 1 && preRollMs > 320) preRollMs -= preRoll.shift().length / c.ctx.sampleRate * 1000;
+              // 远处一直有人说话不算「没声音」：推迟无声提示，界面会提示已被挡住。
+              if (gateState.audible) armSilence();
+              return;
+            }
+
+            if (gateState.justOpened) {
+              preRoll.push(new Float32Array(samples));
+              preRoll.forEach(data => {
+                const pre = c.ctx.createBuffer(1, data.length, c.ctx.sampleRate);
+                pre.getChannelData(0).set(data);
+                decoder.acceptWaveform(pre);
+              });
+              preRoll = [];
+              preRollMs = 0;
+              voiceStartedAt = now;
               finalRequested = false;
               lastVoiceAt = now;
-            } else if (voiceStartedAt && !finalRequested && now - voiceStartedAt >= 120
-              && now - lastVoiceAt >= 420) {
+            } else {
+              decoder.acceptWaveform(buffer);
+              if (rms >= gateState.threshold * 0.55) {
+                if (!voiceStartedAt || finalRequested) { voiceStartedAt = now; finalRequested = false; }
+                lastVoiceAt = now;
+              }
+            }
+
+            // 门因句末停顿关上（或无门控时的短静音）就请求最终结果，
+            // 不等 Vosk 默认的、更保守的端点超时。
+            if (!finalRequested && voiceStartedAt && now - voiceStartedAt >= 100
+              && (gateState.justClosed || now - lastVoiceAt >= 420)) {
               finalRequested = true;
+              voiceStartedAt = 0;
               decoder.retrieveFinalResult();
             }
           } catch (_) { events.error('offline-engine'); }
@@ -1586,7 +1806,7 @@ const OfflineVoice = (() => {
    * 对不上就带参数重新取一次页面。
    * ------------------------------------------------------------------ */
 
-  const REQUIRED_IDS = ['welcome', 'pack-button', 'setup', 'practice', 'results', 'answer-form', 'question', 'voice-button', 'bubble-area', 'bubble-field'];
+  const REQUIRED_IDS = ['welcome', 'pack-button', 'setup', 'practice', 'results', 'answer-form', 'question', 'voice-button', 'bubble-area', 'bubble-field', 'mic-group', 'mic-setup-note', 'mic-meter', 'mic-track', 'mic-fill', 'mic-threshold', 'mic-state', 'mic-note', 'mic-switch'];
   const domMatches = REQUIRED_IDS.every((id) => document.getElementById(id));
   if (!domMatches) {
     if (location.search.indexOf('fresh=') === -1) {
@@ -1622,7 +1842,7 @@ const OfflineVoice = (() => {
   const inFrame = window.self !== window.top;
   const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
-  const defaults = { mode: 'type', level: 'two', count: 10, welcomed: false, voiceEngine: 'browser' };
+  const defaults = { mode: 'type', level: 'two', count: 10, welcomed: false, voiceEngine: 'browser', micMode: 'near' };
   let prefs = Object.assign({}, defaults);
   let best = {};
 
@@ -1655,6 +1875,7 @@ const OfflineVoice = (() => {
   }
 
   if (['type', 'voice', 'bubble'].indexOf(prefs.mode) === -1) prefs.mode = defaults.mode;
+  if (['near', 'standard'].indexOf(prefs.micMode) === -1) prefs.micMode = defaults.micMode;
   if (['two', 'mixed', 'three'].indexOf(prefs.level) === -1) prefs.level = defaults.level;
   if ([0, 10, 20, 30].indexOf(prefs.count) === -1) prefs.count = defaults.count;
 
@@ -1758,6 +1979,15 @@ const OfflineVoice = (() => {
       setClass(button, 'selected', on);
       button.setAttribute('aria-pressed', String(on));
     });
+    document.querySelectorAll('[data-mic]').forEach((button) => {
+      const on = button.dataset.mic === prefs.micMode;
+      setClass(button, 'selected', on);
+      button.setAttribute('aria-pressed', String(on));
+    });
+    el('mic-group').hidden = prefs.mode !== 'voice';
+    el('mic-setup-note').textContent = offlineReady
+      ? '只听近处会关掉自动增益、只把近处响亮的声音送去识别，需把手机拿近嘴边；练习中也能随时切换。'
+      : '只听近处需要离线语音包；未装包时的浏览器语音服务由浏览器直接收音，无法在本地挡住远处声音。';
     document.querySelectorAll('[data-level]').forEach((button) => {
       const on = button.dataset.level === prefs.level;
       setClass(button, 'selected', on);
@@ -1786,6 +2016,14 @@ const OfflineVoice = (() => {
       }
       prefs.mode = button.dataset.mode;
       if (prefs.mode === 'voice') prefs.voiceEngine = offlineReady ? 'offline' : 'browser';
+      syncSetup();
+      persist();
+    });
+  });
+
+  document.querySelectorAll('[data-mic]').forEach((button) => {
+    button.addEventListener('click', () => {
+      prefs.micMode = button.dataset.mic;
       syncSetup();
       persist();
     });
@@ -2508,8 +2746,27 @@ const OfflineVoice = (() => {
         failVoice('语音识别出了点问题，可以重试或改用打字作答。');
       }
     }
+    function voiceLevel(info) {
+      // 音量条用 dB 标度：约 -55 dB（安静）到 -5 dB（很响）；橙线是当前开门门槛。
+      const percent = (rms) => {
+        const db = 20 * Math.log10(Math.max(rms, 0.00001));
+        return Math.max(0, Math.min(100, (db + 55) / 50 * 100));
+      };
+      el('mic-fill').style.width = `${percent(info.rms)}%`;
+      el('mic-threshold').style.left = `${percent(info.threshold)}%`;
+      setClass(el('mic-track'), 'is-open', info.open);
+      const state = info.open ? '正在收你的声音'
+        : info.audible ? '远处声音已挡住'
+          : info.mode === 'near' ? '只听近处 · 等你说话' : '标准收音 · 等你说话';
+      if (el('mic-state').textContent !== state) el('mic-state').textContent = state;
+      const note = info.open ? '正在收音，只说数字即可。'
+        : info.audible ? '刚听到的声音较小，没有送去识别；请把手机拿近嘴边再说。'
+          : info.mode === 'near' ? '把手机拿到嘴边约一掌（15–25 厘米）只说数字；音量越过橙线才会识别。'
+            : '标准收音灵敏度更高；周围有人说话时建议切回「只听近处」。';
+      if (el('mic-note').textContent !== note) el('mic-note').textContent = note;
+    }
     if (offlineReady) {
-      instance = OfflineVoice.listener({ start: started, text: transcript, error: failed });
+      instance = OfflineVoice.listener({ start: started, text: transcript, error: failed, level: voiceLevel }, { micMode: prefs.micMode });
       return instance;
     }
     instance = new Recognition();
@@ -2561,8 +2818,21 @@ const OfflineVoice = (() => {
     }, delay);
   }
 
+  function updateMicUI() {
+    const near = prefs.micMode === 'near';
+    el('mic-switch').textContent = near ? '只听近处：开 · 切到标准收音' : '只听近处：关 · 切到只听近处';
+    el('mic-meter').hidden = !offlineReady;
+    el('mic-state').textContent = near ? '只听近处 · 等你说话' : '标准收音 · 等你说话';
+    el('mic-note').textContent = !offlineReady
+      ? (near ? '浏览器语音服务无法过滤远处声音；装好离线语音包后用「只听近处」效果最好。' : '浏览器语音服务由浏览器直接收音，灵敏度无法调整。')
+      : near ? '把手机拿到嘴边约一掌（15–25 厘米）只说数字；音量越过橙线才会识别。'
+        : '标准收音灵敏度更高；周围有人说话时建议切回「只听近处」。';
+    el('mic-fill').style.width = '0%';
+  }
+
   function startVoice() {
     el('voice-engine').textContent = offlineReady ? '离线语音 · 普通话' : '浏览器语音服务';
+    updateMicUI();
     wantListen = true;
     paused = false;
     micProblem = null;
@@ -2588,6 +2858,7 @@ const OfflineVoice = (() => {
 
   function pauseVoice(release) {
     paused = true;
+    el('mic-fill').style.width = '0%';
     clearTimeout(restartTimer);
     if (release) abortMic();
     else if (recognition && recognition.hold) recognition.hold();
@@ -2706,6 +2977,16 @@ const OfflineVoice = (() => {
     el('voice-hint').textContent = '只说数字，识别后自动进入下一题；点麦克风可暂停';
     setVoiceState('listening');
     listen();
+  });
+
+  el('mic-switch').addEventListener('click', () => {
+    if (view !== 'practice' || prefs.mode !== 'voice' || locked) return;
+    prefs.micMode = prefs.micMode === 'near' ? 'standard' : 'near';
+    persist();
+    syncSetup();
+    stopVoice();
+    startVoice();
+    setFeedback(prefs.micMode === 'near' ? '已开启只听近处，请把手机拿近嘴边说' : '已切到标准收音，灵敏度更高');
   });
 
   el('new-tab').addEventListener('click', () => {

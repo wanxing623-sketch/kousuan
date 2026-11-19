@@ -139,6 +139,8 @@ async function testOffline(browser, base) {
   await page.click('#manage-pack');
   await state('ready');
   await page.click('#pack-button');
+  assert(await page.isVisible('#mic-group'), 'mic range settings show for voice mode');
+  assert.equal(await page.getAttribute('[data-mic="near"]', 'aria-pressed'), 'true', 'near-field gate is the default');
   await fixQuestion(page);
   await page.evaluate(() => { window.refuseMic = true; });
   await page.click('#start-button');
@@ -148,6 +150,8 @@ async function testOffline(browser, base) {
   await page.click('#voice-retry');
   await page.waitForFunction(() => document.querySelector('#score-label').textContent === '答对 1 题', null, { timeout: 60000 });
   await page.waitForFunction(() => document.querySelector('#progress-label').textContent === '第 2 / 10 题');
+  assert(await page.isVisible('#mic-meter'), 'live mic level meter shows in voice practice');
+  assert.match(await page.textContent('#mic-switch'), /只听近处：开/);
   console.log('✓ offline cold start and permission retry; real Chinese WAV → Vosk WASM → 83 → next question');
 
   await page.click('#voice-button');

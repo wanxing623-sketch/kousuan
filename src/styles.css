@@ -524,6 +524,59 @@ button { cursor: pointer; }
   color: var(--muted-2);
 }
 
+.mic-meter {
+  max-width: 340px;
+  margin: 10px auto 0;
+  text-align: left;
+}
+
+.mic-meter-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.mic-meter-head span:last-child { font-weight: 700; color: #46634d; }
+
+.mic-track {
+  position: relative;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 99px;
+  background: #e8ece7;
+  overflow: hidden;
+}
+
+#mic-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: #9db8a4;
+  transition: width .12s linear, background-color .15s ease;
+}
+
+.mic-track.is-open #mic-fill { background: var(--green); }
+
+#mic-threshold {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background: var(--orange);
+}
+
+.mic-note {
+  max-width: 420px;
+  min-height: 17px;
+  margin: 7px auto 0;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
 .voice-actions {
   display: flex;
   flex-wrap: wrap;
