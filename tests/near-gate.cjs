@@ -44,6 +44,19 @@ function opensWithin(gate, rms, blocks) {
   console.log('✓ near mode: a single transient click does not open the gate');
 }
 
+// 开门后音节尾巴（低于开门门槛、但明显高于底噪）不算静音，不能在句中收尾
+{
+  const gate = NearGate.create('near');
+  feed(gate, 0.001, 10);
+  assert.equal(opensWithin(gate, 0.12, 2), true);
+  let closed = false;
+  for (let i = 0; i < 30; i += 1) if (gate.update(0.015, BLOCK).justClosed) closed = true;
+  assert.equal(closed, false, 'syllable tails above the noise floor must not end the utterance');
+  for (let i = 0; i < 20; i += 1) if (gate.update(0.001, BLOCK).justClosed) closed = true;
+  assert.equal(closed, true, 'real silence after the tail still closes the gate');
+  console.log('✓ near mode: syllable tails do not trigger mid-utterance finalization');
+}
+
 // 持续嘈杂底噪会抬高门槛：盖过底噪一点点的远处声音仍被挡，真正近讲才开门
 {
   const gate = NearGate.create('near');

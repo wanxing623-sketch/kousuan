@@ -290,7 +290,7 @@ const OfflineVoice = (() => {
               lastVoiceAt = now;
             } else {
               decoder.acceptWaveform(buffer);
-              if (rms >= gateState.threshold * 0.55) {
+              if (rms >= (gateState.offThreshold || gateState.threshold * 0.55)) {
                 if (!voiceStartedAt || finalRequested) { voiceStartedAt = now; finalRequested = false; }
                 lastVoiceAt = now;
               }

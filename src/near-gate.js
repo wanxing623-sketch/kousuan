@@ -41,7 +41,9 @@ const NearGate = (() => {
      * audible 表示「有明显高于底噪的声音，但还没响到能开门」——多半是被挡住的远处声音。 */
     function update(rms, blockMs) {
       const on = threshold();
-      const off = on * 0.55;
+      // 关门门槛要远低于开门门槛：汉字音节的尾巴和字间停顿响度会掉到开门值的一半以下，
+      // 若按开门值判静音，会在句中误收尾、只提交第一个字。用接近环境底噪的低门槛判「还在说」。
+      const off = Math.max(0.009, Math.min(on * 0.55, floor * 2.5));
       let justOpened = false;
       let justClosed = false;
 
@@ -80,6 +82,7 @@ const NearGate = (() => {
         justOpened,
         justClosed,
         threshold: threshold(),
+        offThreshold: off,
         floor,
         audible: rms >= Math.max(0.012, floor * 1.6),
       };

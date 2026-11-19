@@ -160,6 +160,8 @@ async function testOffline(browser, base) {
       if (state.includes('正在收你的声音')) diag.sawOpen = true;
       if (state.includes('已挡住')) diag.sawBlocked = true;
       diag.heard = document.querySelector('#heard-text').textContent || diag.heard;
+      diag.progress = document.querySelector('#progress-label').textContent;
+      diag.feedback = document.querySelector('#feedback').textContent;
     }, 100);
   });
   try {
@@ -168,8 +170,8 @@ async function testOffline(browser, base) {
     const diag = await page.evaluate(() => window.__micDiag && {
       maxFill: window.__micDiag.maxFill, maxThr: window.__micDiag.maxThr,
       sawOpen: window.__micDiag.sawOpen, sawBlocked: window.__micDiag.sawBlocked,
-      heard: window.__micDiag.heard,
-      feedback: document.querySelector('#feedback').textContent,
+      heard: window.__micDiag.heard, progress: window.__micDiag.progress,
+      feedback: window.__micDiag.feedback,
     }).catch(() => null);
     throw new Error(`voice answer not scored; mic diag: ${JSON.stringify(diag)}`);
   }
