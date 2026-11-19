@@ -124,10 +124,14 @@ const OfflineVoice = (() => {
   }
 
   // 一个练习会话只建一个模型；每道题一个解码器，前一题排队的结果不能串到下一题。
-  function listener(events) {
+  // options.nearVoice = { mode: 'strong' | 'standard' | 'off', voiceLevel }：近讲收音设置，
+  // 见 near-voice.js。
+  function listener(events, options) {
     const grammar = numberGrammar();
+    const near = Object.assign({ mode: 'strong', voiceLevel: null }, options && options.nearVoice);
     let model, loading, cancelLoad, capture, decoder, silenceTimer;
     let disposed = false;
+    let ignoredBefore = 0; // 之前几次打开麦克风时已过滤掉的人声段数
     function freeModel() {
       if (!model) return;
       // 0.0.8 的 terminate() 向 worker 发消息删除已构造的模型。加载失败时模型尚不存在。
@@ -160,6 +164,7 @@ const OfflineVoice = (() => {
       capture = null;
       hold();
       if (!c) return;
+      if (c.gate) ignoredBefore += c.gate.meter().ignored;
       if (c.node) { c.node.onaudioprocess = null; c.node.disconnect(); }
       if (c.source) c.source.disconnect();
       if (c.stream) c.stream.getTracks().forEach(track => track.stop());
@@ -172,24 +177,25 @@ const OfflineVoice = (() => {
         if (decoder) armSilence();
       }, 10000);
     }
-    let voiceStartedAt = 0;
-    let lastVoiceAt = 0;
-    let finalRequested = false;
     function decode() {
-      const d = decoder = new model.KaldiRecognizer(capture.ctx.sampleRate, grammar);
-      voiceStartedAt = 0;
-      lastVoiceAt = 0;
-      finalRequested = false;
+      const c = capture;
+      const d = decoder = new model.KaldiRecognizer(c.ctx.sampleRate, grammar);
+      // 新的一题：丢掉上一题没说完的半句话，保留底噪和校准。
+      c.gate.reset();
+      c.pending = null;
       function heard(text, final) {
         if (d !== decoder) return;
+        let info = null;
         if (final) {
-          voiceStartedAt = 0;
-          lastVoiceAt = 0;
-          finalRequested = false;
+          // 刚收尾的那一段；Vosk 自己判定句末时则是进行中的这一段。
+          info = c.pending || c.gate.segment();
+          c.pending = null;
         }
         if (!text) return;
+        // 很短的响动，或一大段别人说话里「凑」出的单个数字，不当作回答。
+        if (final && !nearVoiceAccepts(text, info)) return;
         armSilence();
-        events.text([text], final);
+        events.text([text], final, info && typeof info.level === 'number' ? { level: info.level } : undefined);
       }
       d.on('partialresult', msg => heard(msg.result.partial, false));
       d.on('result', msg => heard(msg.result.text, true));
@@ -213,7 +219,12 @@ const OfflineVoice = (() => {
         try { c.ctx = new Audio({ sampleRate: 16000 }); }
         catch (_) { c.ctx = new Audio(); }
         const unlock = c.ctx.resume();
-        const permission = navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: { ideal: 16000 }, echoCancellation: true, noiseSuppression: true }, video: false })
+        const audio = { channelCount: 1, sampleRate: { ideal: 16000 }, echoCancellation: true, noiseSuppression: true };
+        // 近讲收音：关掉自动增益（它会在你不说话时把远处的人声放大到和你一样响），
+        // 并在支持的浏览器上请求系统的人声隔离。都只是「尽量」，不支持也不会报错。
+        c.agc = near.mode === 'off';
+        if (!c.agc) Object.assign(audio, { autoGainControl: false, voiceIsolation: true });
+        const permission = navigator.mediaDevices.getUserMedia({ audio, video: false })
           .then(stream => {
             if (c !== capture) { stream.getTracks().forEach(track => track.stop()); return; }
             c.stream = stream;
@@ -226,34 +237,28 @@ const OfflineVoice = (() => {
         await Promise.all([unlock, permission, getModel()]);
         if (c !== capture) return;
         c.source = c.ctx.createMediaStreamSource(c.stream);
+        // 近讲门限只把面前的说话声送进解码器，并在说完后约 0.4 秒请求最终结果，
+        // 不必等 Vosk 自己更保守的句末判定。
+        c.gate = createNearVoiceGate(c.ctx.sampleRate, near);
+        c.meterAt = 0;
         // ScriptProcessor also supports mobile Safari versions without AudioWorklet.
         c.node = c.ctx.createScriptProcessor(1024, 1, 1);
         c.node.onaudioprocess = event => {
           if (c !== capture || !decoder) return;
+          const d = decoder;
+          const buffer = event.inputBuffer;
           try {
-            const buffer = event.inputBuffer;
-            decoder.acceptWaveform(buffer);
-
-            // Finalize after a short quiet tail instead of waiting for Vosk's more
-            // conservative endpoint timeout. Sample the RMS cheaply on-device.
-            const samples = buffer.getChannelData(0);
-            let energy = 0, count = 0;
-            for (let i = 0; i < samples.length; i += 4) {
-              energy += samples[i] * samples[i];
-              count += 1;
-            }
-            const now = performance.now();
-            const rms = Math.sqrt(energy / Math.max(1, count));
-            if (rms >= 0.008) {
-              if (!voiceStartedAt || finalRequested) voiceStartedAt = now;
-              finalRequested = false;
-              lastVoiceAt = now;
-            } else if (voiceStartedAt && !finalRequested && now - voiceStartedAt >= 120
-              && now - lastVoiceAt >= 420) {
-              finalRequested = true;
-              decoder.retrieveFinalResult();
-            }
-          } catch (_) { events.error('offline-engine'); }
+            c.gate.process(buffer.getChannelData(0),
+              data => d.acceptWaveformFloat(data, buffer.sampleRate),
+              info => { c.pending = info; d.retrieveFinalResult(); });
+          } catch (_) { events.error('offline-engine'); return; }
+          const now = performance.now();
+          if (events.meter && now - c.meterAt >= 60) {
+            c.meterAt = now;
+            const meter = c.gate.meter();
+            meter.ignored += ignoredBefore;
+            events.meter(meter);
+          }
         };
         c.source.connect(c.node);
         c.node.connect(c.ctx.destination);
@@ -276,7 +281,20 @@ const OfflineVoice = (() => {
       if (cancelLoad) cancelLoad();
       freeModel();
     }
-    return { start, hold, abort, dispose };
+    // 调整近讲收音（模式、校准音量）。返回 true 表示麦克风要重新打开才能生效
+    // （开 / 关自动增益）。
+    function setNearVoice(next) {
+      if (next && next.mode) near.mode = next.mode;
+      if (next && 'voiceLevel' in next) near.voiceLevel = next.voiceLevel;
+      const c = capture;
+      if (!c) return false;
+      if (c.gate) {
+        c.gate.setMode(near.mode);
+        c.gate.setVoiceLevel(near.voiceLevel);
+      }
+      return c.agc !== (near.mode === 'off');
+    }
+    return { start, hold, abort, dispose, setNearVoice };
   }
   return { unsupported, installed, install, listener, size };
 })();

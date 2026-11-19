@@ -884,6 +884,21 @@ body { background: #f5f6f3; }
 .voice-button.is-listening { background: #f4eee8; color: #994a2f; }
 .heard-text { color: #994a2f; }
 .voice-hint { color: #7a867e; font-size: 12px; }
+/* 近讲收音：音量条上的竖线是当前门限，越过它（条变绿）的声音才会送去识别 */
+.near-meter { position: relative; width: min(220px, 72%); height: 6px; margin: 12px auto 0; border-radius: 99px; background: #e7ece7; }
+.near-meter span { position: absolute; inset: 0; border-radius: inherit; background: #c2cec4; transform: scaleX(0); transform-origin: left center; transition: transform .08s linear, background-color .15s ease; }
+.near-meter.is-open span { background: #4e805b; }
+.near-meter i { position: absolute; top: -3px; bottom: -3px; left: 0; width: 2px; margin-left: -1px; border-radius: 1px; background: #a55235; }
+.near-toggle { display: inline-flex; align-items: center; min-height: 44px; margin-top: 6px; padding: 0 14px; border: 1px solid #dfe6df; border-radius: 99px; background: #fff; color: #46564d; font-size: 12px; font-weight: 600; }
+.near-toggle::before { width: 8px; height: 8px; margin-right: 7px; border-radius: 50%; background: #4e805b; box-shadow: 0 0 0 3px rgba(78, 128, 91, .16); content: ''; }
+.near-toggle[data-near="standard"]::before { background: #8ba890; box-shadow: 0 0 0 3px rgba(139, 168, 144, .16); }
+.near-toggle[data-near="off"]::before { background: #c5ccc7; box-shadow: none; }
+.near-toggle:hover { border-color: #b9cbbc; }
+.near-count:not(:empty) { margin-left: 6px; color: #7a867e; font-weight: 500; }
+.near-count:not(:empty)::before { margin-right: 6px; content: '·'; }
+@media (prefers-reduced-motion: reduce) {
+  .near-meter span { transition: none; }
+}
 .mini-button { min-height: 46px; border-color: #dfe6df; border-radius: 10px; }
 .results-panel { padding: 30px 26px 24px; }
 .result-icon { background: #eef3ee; color: #477558; }

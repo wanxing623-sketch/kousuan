@@ -162,12 +162,14 @@
             </span>
             <span id="voice-label">正在聆听…</span>
           </button>
+          <div id="near-meter" class="near-meter" aria-hidden="true" hidden><span id="near-level"></span><i id="near-mark" hidden></i></div>
           <p id="heard-text" class="heard-text" aria-live="polite"></p>
           <p id="voice-hint" class="voice-hint">说完答案会自动进入下一题，点麦克风可暂停</p>
           <div id="voice-actions" class="voice-actions" hidden>
             <button id="voice-retry" class="mini-button" type="button">重新打开麦克风</button>
             <button id="new-tab" class="mini-button" type="button" hidden>在新窗口打开</button>
           </div>
+          <button id="near-toggle" class="near-toggle" type="button" data-near="strong" hidden><span id="near-toggle-label">收音：只听面前</span><span id="near-count" class="near-count"></span></button>
           <button id="switch-mode" class="voice-switch" type="button">改用打字作答</button>
         </div>
       </div>

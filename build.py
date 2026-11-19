@@ -68,7 +68,9 @@ def main():
     pack = json.dumps(files, separators=(',', ':'))
     store = read('voice-store.js')
     physics = (ROOT / 'third_party' / 'matter-js' / 'matter.min.js').read_text(encoding='utf-8')
-    js = physics + '\n' + store + '\n' + read('offline.js').replace('/*@files*/[]', pack) + '\n' + read('app.js')
+    # near-voice.js（近讲收音门限）和 spoken-number.js（数字解析）是纯函数，也供 tests/unit.cjs 直接加载。
+    helpers = read('near-voice.js') + '\n' + read('spoken-number.js')
+    js = physics + '\n' + store + '\n' + helpers + '\n' + read('offline.js').replace('/*@files*/[]', pack) + '\n' + read('app.js')
     html = read('page.html').replace('<!--@styles-->', '<style>\n' + escape(read('styles.css')) + '  </style>')
     html = html.replace('<!--@app-->', '<script>\n' + escape(js) + '\n  </script>')
     if '<!--@' in html:
