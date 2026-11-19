@@ -163,8 +163,8 @@ async function testOffline(browser, base) {
       diag.progress = document.querySelector('#progress-label').textContent;
       diag.feedback = document.querySelector('#feedback').textContent;
       if (diag.feedback && !diag.feedbackSeen.includes(diag.feedback)) diag.feedbackSeen.push(diag.feedback);
-      // 判错的那一刻 heard-text 还留着触发判分的最终识别文字，记下来看提交的到底是什么
-      if (diag.feedback.startsWith('正确答案是')) diag.given = document.querySelector('#heard-text').textContent;
+      // 只记第一次判错瞬间的识别文字（后续题目都会被覆盖）：那是首题提交的值
+      if (!diag.given && diag.feedback.startsWith('正确答案是')) diag.given = document.querySelector('#heard-text').textContent;
     }, 100);
   });
   try {
