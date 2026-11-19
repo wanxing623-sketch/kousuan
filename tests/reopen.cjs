@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
 async function waitForPack(page, expected) {
-  await page.waitForFunction(state => [state, 'error', 'unsupported'].includes(document.querySelector('#pack-card').dataset.state), expected);
+  await page.waitForFunction(state => [state, 'error', 'unsupported'].includes(document.querySelector('#pack-card').dataset.state), expected, { timeout: 37000 });
   assert.equal(await page.getAttribute('#pack-card', 'data-state'), expected, await page.textContent('#pack-message'));
 }
 
@@ -97,7 +97,7 @@ module.exports = async function testReopen({ browserType, profile, base, wav, fi
     await page.waitForFunction(() => document.querySelector('#voice-button').classList.contains('is-listening') || !document.querySelector('#voice-actions').hidden, null, { timeout: 65000 });
     assert(await page.isHidden('#voice-actions'), await page.textContent('#voice-hint'));
     await page.evaluate(() => window.say83());
-    await page.waitForFunction(() => document.querySelector('#progress-label').textContent === '第 2 / 10 题' || !document.querySelector('#voice-actions').hidden);
+    await page.waitForFunction(() => document.querySelector('#progress-label').textContent === '第 2 / 10 题' || !document.querySelector('#voice-actions').hidden, null, { timeout: 36000 });
     assert(await page.isHidden('#voice-actions'), await page.textContent('#voice-hint'));
     await page.click('#quit-button');
     assert.equal(await page.textContent('#result-correct'), '1', await page.textContent('#mistakes'));

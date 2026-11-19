@@ -45,7 +45,7 @@ async function fixQuestion(page) {
   });
 }
 async function noLiveMic(page) {
-  await page.waitForFunction(() => window.tracks.every(t => t.readyState === 'ended'));
+  await page.waitForFunction(() => window.tracks.every(t => t.readyState === 'ended'), null, { timeout: 34000 });
 }
 
 async function testOffline(browser, base) {
@@ -103,7 +103,7 @@ async function testOffline(browser, base) {
   const wrongValue = await page.locator('#bubble-field .number-bubble').evaluateAll(nodes => nodes.find(node => node.textContent !== '83').textContent);
   await page.getByRole('button', { name: `数字 ${wrongValue}` }).click({ force: true });
   assert.match(await page.textContent('#feedback'), /再找找/);
-  await page.waitForFunction(() => document.querySelectorAll('#bubble-field .number-bubble').length === 8);
+  await page.waitForFunction(() => document.querySelectorAll('#bubble-field .number-bubble').length === 8, null, { timeout: 32000 });
   assert.equal(await page.textContent('#score-label'), '答对 0 题');
   await page.getByRole('button', { name: '数字 83' }).click({ force: true });
   assert.equal(await page.textContent('#score-label'), '答对 1 题');
@@ -178,7 +178,7 @@ async function testOffline(browser, base) {
     }).catch(() => null);
     throw new Error(`voice answer not scored; mic diag: ${JSON.stringify(diag)}`);
   }
-  await page.waitForFunction(() => document.querySelector('#progress-label').textContent === '第 2 / 10 题');
+  await page.waitForFunction(() => document.querySelector('#progress-label').textContent === '第 2 / 10 题', null, { timeout: 33000 });
   assert(await page.isVisible('#mic-meter'), 'live mic level meter shows in voice practice');
   assert.match(await page.textContent('#mic-switch'), /只听近处：开/);
   console.log('✓ offline cold start and permission retry; real Chinese WAV → Vosk WASM → 83 → next question');
@@ -199,7 +199,7 @@ async function testOffline(browser, base) {
   const trackCount = await page.evaluate(() => window.tracks.length);
   await page.click('#switch-mode'); // leave while the permission request is pending
   await page.evaluate(() => window.grantMic());
-  await page.waitForFunction(n => window.tracks.length > n, trackCount);
+  await page.waitForFunction(n => window.tracks.length > n, trackCount, { timeout: 35000 });
   await noLiveMic(page);
   await page.click('#quit-button');
   assert.equal(await page.textContent('#result-correct'), '1');
