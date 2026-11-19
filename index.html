@@ -1438,7 +1438,9 @@ const NearGate = (() => {
         quietMs = 0;
       } else {
         quietMs += blockMs;
-        if (quietMs >= 450) { // 句末停顿约 450 ms 后关门，尾巴的远处声音不再送入
+        // 关门等待要明显长于字间停顿：逐字慢说「八…十…三」时字间可停半秒多，
+        // 太早关门会只提交第一个字。约 850 ms 真静音才算说完，尾巴的远处声音不再送入。
+        if (quietMs >= 850) {
           open = false;
           justClosed = true;
           quietMs = 0;
