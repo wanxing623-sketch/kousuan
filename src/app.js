@@ -958,11 +958,13 @@
       el('mic-threshold').style.left = `${percent(info.threshold)}%`;
       setClass(el('mic-track'), 'is-open', info.open);
       const state = info.open ? '正在收你的声音'
-        : info.audible ? '远处声音已挡住'
-          : info.mode === 'near' ? '只听近处 · 等你说话' : '标准收音 · 等你说话';
+        : info.armed === false && info.audible ? '先等周围安静一下'
+          : info.audible ? '远处声音已挡住'
+            : info.mode === 'near' ? '只听近处 · 等你说话' : '标准收音 · 等你说话';
       if (el('mic-state').textContent !== state) el('mic-state').textContent = state;
       const note = info.open ? '正在收音，只说数字即可。'
-        : info.audible ? '刚听到的声音较小，没有送去识别；请把手机拿近嘴边再说。'
+        : info.armed === false && info.audible ? '正在等句子边界，安静一下就会开始收音，不会把半句话当答案。'
+          : info.audible ? '刚听到的声音较小，没有送去识别；请把手机拿近嘴边再说。'
           : info.mode === 'near' ? '把手机拿到嘴边约一掌（15–25 厘米）只说数字；音量越过橙线才会识别。'
             : '标准收音灵敏度更高；周围有人说话时建议切回「只听近处」。';
       if (el('mic-note').textContent !== note) el('mic-note').textContent = note;

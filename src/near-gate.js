@@ -24,6 +24,8 @@ const NearGate = (() => {
     const profile = PROFILES[profileName] || PROFILES.standard;
     let floor = 0.008;      // 环境底噪 RMS 估计，随安静/嘈杂缓慢自适应
     let open = false;
+    let armed = true;       // 是否已确认处在句子边界；每次 reset（换解码器）后需重新确认
+    let armMs = 0;
     let loudMs = 0;         // 已持续超过开门门槛的时间
     let quietMs = 0;        // 开门后持续低于关门门槛的时间
 
@@ -31,7 +33,11 @@ const NearGate = (() => {
 
     function reset() {
       // 每道题换解码器时调用：关门并清计时，但保留已学到的底噪，避免重新适应时误收。
+      // 同时要求先听到约 300 ms 安静才开始收第一句：若解码器就绪时用户/录音已在
+      // 句中，前半截残句（如只剩「十三」）会被当成完整答案，必须整段忽略。
       open = false;
+      armed = false;
+      armMs = 0;
       loudMs = 0;
       quietMs = 0;
     }
@@ -47,7 +53,21 @@ const NearGate = (() => {
       let justOpened = false;
       let justClosed = false;
 
-      if (!open) {
+      if (!open && !armed) {
+        // 还没确认句子边界：句中残音一律不收，等响度回落并维持约 300 ms 才待命。
+        loudMs = 0;
+        if (rms <= Math.max(0.009, floor * 1.6)) {
+          armMs += blockMs;
+          if (armMs >= 300) armed = true;
+        } else {
+          armMs = 0;
+        }
+        if (rms < on) {
+          if (rms < floor) floor = floor * 0.94 + rms * 0.06;
+          else floor = floor * 0.985 + rms * 0.015;
+          floor = clamp(floor, 0.0015, profile.floorCap);
+        }
+      } else if (!open) {
         if (rms >= on) {
           // 不要求严格连续：语音块响度起伏时允许衰减累计，避免永远差一点开不了门。
           loudMs += blockMs;
@@ -81,6 +101,7 @@ const NearGate = (() => {
 
       return {
         open,
+        armed,
         justOpened,
         justClosed,
         threshold: threshold(),

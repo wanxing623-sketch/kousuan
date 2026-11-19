@@ -256,12 +256,12 @@ const OfflineVoice = (() => {
             const rms = Math.sqrt(energy / Math.max(1, samples.length));
             const blockMs = samples.length / c.ctx.sampleRate * 1000;
             const gateState = gate ? gate.update(rms, blockMs)
-              : { open: true, justOpened: false, justClosed: false, threshold: 0.008, audible: rms >= 0.008 };
+              : { open: true, armed: true, justOpened: false, justClosed: false, threshold: 0.008, audible: rms >= 0.008 };
 
             if (events.level && (now - lastLevelAt >= 120 || gateState.justOpened || gateState.justClosed)) {
               lastLevelAt = now;
               try {
-                events.level({ rms, peak, threshold: gateState.threshold, open: gateState.open, audible: gateState.audible, mode: micMode });
+                events.level({ rms, peak, threshold: gateState.threshold, open: gateState.open, armed: gateState.armed, audible: gateState.audible, mode: micMode });
               } catch (_) { /* 界面更新失败不影响识别 */ }
             }
 
